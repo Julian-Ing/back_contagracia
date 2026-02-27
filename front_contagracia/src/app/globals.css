@@ -1,0 +1,300 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* Configurar dark mode con class */
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+@variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 44.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 355.7 100% 97.3%;
+    --warning: 47.9 95.8% 53.1%;
+    --warning-foreground: 26 83.3% 14.1%;
+    --info: 217.2 91.2% 59.8%;
+    --info-foreground: 222.2 47.4% 11.2%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 68.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --success: 142.1 70.6% 45.3%;
+    --success-foreground: 144.9 80.4% 10%;
+    --warning: 47.9 95.8% 53.1%;
+    --warning-foreground: 26 83.3% 14.1%;
+    --info: 217.2 91.2% 59.8%;
+    --info-foreground: 222.2 47.4% 11.2%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+}
+
+body {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%);
+}
+
+.dark body {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+}
+
+/* Custom scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--secondary));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.8);
+}
+
+/* Firefox scrollbar support */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary)) hsl(var(--secondary));
+}
+
+/* AI Chat markdown — compact styles */
+.ai-markdown p:first-child { margin-top: 0; }
+.ai-markdown p:last-child { margin-bottom: 0; }
+.ai-markdown ul, .ai-markdown ol { padding-left: 1.25em; }
+.ai-markdown li { margin-top: 0.125em; margin-bottom: 0.125em; }
+.ai-markdown code {
+  font-size: 0.8em;
+  padding: 0.125em 0.35em;
+  border-radius: 0.25em;
+  background: rgba(0,0,0,0.06);
+}
+.dark .ai-markdown code { background: rgba(255,255,255,0.08); }
+
+/* ===== React Big Calendar — Dark Mode ===== */
+.dark .rbc-calendar {
+  color: hsl(var(--foreground));
+}
+
+/* Toolbar */
+.dark .rbc-toolbar {
+  color: hsl(var(--foreground));
+}
+.dark .rbc-toolbar button {
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+.dark .rbc-toolbar button:hover,
+.dark .rbc-toolbar button:focus {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+.dark .rbc-toolbar button.rbc-active {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+}
+
+/* Month view cells */
+.dark .rbc-month-view,
+.dark .rbc-time-view {
+  background-color: hsl(var(--card));
+  border-color: hsl(var(--border));
+}
+.dark .rbc-month-row,
+.dark .rbc-day-bg,
+.dark .rbc-time-content,
+.dark .rbc-time-header,
+.dark .rbc-time-header-content {
+  border-color: hsl(var(--border));
+}
+.dark .rbc-header {
+  border-color: hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+  background-color: hsl(var(--secondary));
+}
+.dark .rbc-header + .rbc-header {
+  border-left-color: hsl(var(--border));
+}
+.dark .rbc-day-bg + .rbc-day-bg {
+  border-left-color: hsl(var(--border));
+}
+.dark .rbc-month-row + .rbc-month-row {
+  border-top-color: hsl(var(--border));
+}
+
+/* Off-range days */
+.dark .rbc-off-range-bg {
+  background-color: hsl(var(--muted) / 0.3);
+}
+.dark .rbc-off-range {
+  color: hsl(var(--muted-foreground) / 0.4);
+}
+
+/* Today highlight */
+.dark .rbc-today {
+  background-color: hsl(var(--primary) / 0.1);
+}
+
+/* Date cell */
+.dark .rbc-date-cell {
+  color: hsl(var(--foreground));
+}
+.dark .rbc-date-cell.rbc-now {
+  color: hsl(var(--primary));
+  font-weight: 700;
+}
+
+/* Time view */
+.dark .rbc-time-slot {
+  border-top-color: hsl(var(--border) / 0.5);
+}
+.dark .rbc-timeslot-group {
+  border-bottom-color: hsl(var(--border));
+}
+.dark .rbc-time-gutter .rbc-label,
+.dark .rbc-time-header-gutter {
+  color: hsl(var(--muted-foreground));
+  background-color: hsl(var(--card));
+}
+.dark .rbc-time-header-gutter {
+  border-color: hsl(var(--border));
+}
+.dark .rbc-day-slot .rbc-time-slot {
+  border-top-color: hsl(var(--border) / 0.3);
+}
+.dark .rbc-time-content > * + * > * {
+  border-left-color: hsl(var(--border));
+}
+.dark .rbc-allday-cell {
+  background-color: hsl(var(--card));
+}
+.dark .rbc-current-time-indicator {
+  background-color: hsl(var(--destructive));
+}
+
+/* Events */
+.dark .rbc-event {
+  border-color: transparent;
+}
+.dark .rbc-event.rbc-selected {
+  box-shadow: 0 0 0 2px hsl(var(--ring));
+}
+
+/* Show more link */
+.dark .rbc-show-more {
+  color: hsl(var(--primary));
+}
+
+/* Agenda view */
+.dark .rbc-agenda-view table.rbc-agenda-table {
+  border-color: hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+.dark .rbc-agenda-view table.rbc-agenda-table thead > tr > th {
+  border-bottom-color: hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+  background-color: hsl(var(--secondary));
+}
+.dark .rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
+  border-color: hsl(var(--border));
+}
+.dark .rbc-agenda-view table.rbc-agenda-table tbody > tr + tr {
+  border-top-color: hsl(var(--border));
+}
+.dark .rbc-agenda-empty {
+  color: hsl(var(--muted-foreground));
+}
+
+/* Overlay */
+.dark .rbc-overlay {
+  background-color: hsl(var(--popover));
+  border-color: hsl(var(--border));
+  color: hsl(var(--popover-foreground));
+}
+.dark .rbc-overlay-header {
+  border-bottom-color: hsl(var(--border));
+}

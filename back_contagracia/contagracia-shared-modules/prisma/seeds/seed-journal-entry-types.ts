@@ -1,0 +1,81 @@
+import { PrismaClient } from '@prisma/client-master';
+
+export const journalEntryTypes = [
+  { key: 'invoice', description: 'Facturas de Venta', color: '#22C55E' },
+  { key: 'invoice_receivable_payment', description: 'Cobros de Factura de Venta', color: '#16A34A' },
+  { key: 'invoice_credit_note', description: 'Notas Crédito de Venta', color: '#F97316' },
+  { key: 'invoice_credit_note_payable_payment', description: 'Abonos a Nota Crédito', color: '#EA580C' },
+  { key: 'invoice_debit_note', description: 'Notas Débito de Venta', color: '#8B5CF6' },
+  { key: 'invoice_debit_note_receivable_payment', description: 'Cobros a Nota Débito', color: '#7C3AED' },
+  { key: 'invoice_voucher', description: 'Recibos de caja', color: '#10B981' },
+  { key: 'expense_voucher', description: 'Comprobantes de egreso', color: '#EF4444' },
+  { key: 'cogs', description: 'Costos de Bienes Vendidos', color: '#F59E0B' },
+  { key: 'expense', description: 'Gastos', color: '#DC2626' },
+  { key: 'expense_payable_payment', description: 'Abonos a Gastos', color: '#B91C1C' },
+  { key: 'expense_return', description: 'Devoluciones de Gasto', color: '#FB923C' },
+  { key: 'expense_return_receivable_payment', description: 'Cobros a Devoluciones de Gastos', color: '#FDBA74' },
+  { key: 'purchase', description: 'Compras', color: '#06B6D4' },
+  { key: 'purchase_payable_payment', description: 'Abonos a Compras', color: '#0891B2' },
+  { key: 'purchase_return', description: 'Devoluciones de Compra', color: '#14B8A6' },
+  { key: 'purchase_return_receivable_payment', description: 'Cobros a Devoluciones de Compras', color: '#0D9488' },
+  { key: 'purchase_order_reception_inventory', description: 'Recepción Orden de Compra - Inventario', color: '#0EA5E9' },
+  { key: 'purchase_order_reception_expense', description: 'Recepción Orden de Compra - Gasto', color: '#0284C7' },
+  { key: 'purchase_order_reception_fixed_asset', description: 'Recepción Orden de Compra - Activo Fijo', color: '#0369A1' },
+  { key: 'purchase_order_approval_adjustment', description: 'Ajuste por Aprobación Orden de Compra', color: '#075985' },
+  { key: 'manual', description: 'Manual', color: '#6B7280' },
+  { key: 'client_prepayment_refund', description: 'Reembolso Anticipo de clientes', color: '#A855F7' },
+  { key: 'supplier_prepayment_refund', description: 'Reembolso Anticipo de proveedores', color: '#9333EA' },
+  { key: 'client_prepayment', description: 'Anticipo de clientes', color: '#C084FC' },
+  { key: 'supplier_prepayment', description: 'Anticipo de proveedores', color: '#D946EF' },
+  { key: 'employee_prepayment', description: 'Anticipo a empleados', color: '#F0ABFC' },
+  { key: 'employee_prepayment_refund', description: 'Reembolso Anticipo de empleados', color: '#E879F9' },
+  { key: 'travel_expense_advance', description: 'Anticipo gastos de viaje', color: '#E879F9' },
+  { key: 'manual_receivable_payment', description: 'Cobros a Documentos Manuales CxC', color: '#4ADE80' },
+  { key: 'manual_payable_payment', description: 'Abonos a Documentos Manuales CxP', color: '#F87171' },
+  { key: 'reversal', description: 'Reversiones de Asientos', color: '#64748B' },
+  { key: 'bank_adjustment', description: 'Ajustes Bancarios', color: '#3B82F6' },
+  { key: 'bank_account_opening', description: 'Saldos iniciales bancarios', color: '#2563EB' },
+  { key: 'tax_payable', description: 'Pago de Impuestos', color: '#7C3AED' },
+  { key: 'bank_transfer', description: 'Transferencias Bancarias', color: '#1D4ED8' },
+  { key: 'inventory', description: 'Movimientos Manuales de Inventario', color: '#84CC16' },
+  { key: 'inventory_import', description: 'Importaciones de Inventario', color: '#65A30D' },
+  { key: 'bank_reconciliation_adjustment', description: 'Ajustes a Conciliaciones', color: '#1E40AF' },
+  { key: 'iva_settlement', description: 'Liquidación de IVA', color: '#BE185D' },
+  { key: 'iva_application', description: 'Aplicación de IVA a Favor', color: '#DB2777' },
+  { key: 'inc_settlement', description: 'Causación INC por Pagar', color: '#EC4899' },
+  { key: 'reteiva_settlement', description: 'Causación ReteIVA por Pagar', color: '#F472B6' },
+  { key: 'retefuente_settlement', description: 'Causación Retefuente por Pagar', color: '#FB7185' },
+  { key: 'reteica_settlement', description: 'Causación ReteICA por Pagar', color: '#FDA4AF' },
+  { key: 'tax_payable_iva', description: 'Pago de Impuestos de IVA', color: '#831843' },
+  { key: 'tax_payable_inc', description: 'Pago de Impuestos de INC', color: '#9D174D' },
+  { key: 'tax_payable_retefuente', description: 'Pago de Impuestos de Retefuente', color: '#BE123C' },
+  { key: 'tax_payable_reteiva', description: 'Pago de Impuestos de ReteIVA', color: '#E11D48' },
+  { key: 'tax_payable_reteica', description: 'Pago de Impuestos de ReteICA', color: '#F43F5E' },
+  { key: 'period_close', description: 'Cierres Contables', color: '#4F46E5' },
+  { key: 'opening_balance', description: 'Saldos Iniciales', color: '#6366F1' },
+  { key: 'payroll', description: 'Liquidación de Nómina', color: '#818CF8' },
+  { key: 'liquidation_service_bonus', description: 'Liquidación de Primas', color: '#A78BFA' },
+  { key: 'liquidation_severance', description: 'Liquidación de Cesantías', color: '#C4B5FD' },
+  { key: 'liquidation_vacation', description: 'Liquidación de Vacaciones', color: '#DDD6FE' },
+  { key: 'liquidation_end_contract', description: 'Liquidación de Fin de Contrato', color: '#EDE9FE' },
+  { key: 'fixed_asset_creation', description: 'Creación de Activo', color: '#78716C' },
+  { key: 'fixed_asset_depreciation', description: 'Depreciación de Activo', color: '#A8A29E' },
+  { key: 'fixed_asset_adjustment', description: 'Ajuste de Activo', color: '#D6D3D1' },
+  { key: 'fixed_asset_annulment', description: 'Anulación de Activo', color: '#57534E' },
+  { key: 'fixed_asset_disposal', description: 'Baja de Activo', color: '#44403C' },
+  { key: 'fixed_asset_sale', description: 'Venta de Activo', color: '#292524' },
+];
+
+export async function seedJournalEntryTypes(prisma: PrismaClient) {
+  console.log('Seeding journal_entry_types...');
+
+  for (const type of journalEntryTypes) {
+    await prisma.journalEntryType.upsert({
+      where: { key: type.key },
+      update: { description: type.description, color: type.color },
+      create: type,
+    });
+  }
+
+  console.log(`  ✓ ${journalEntryTypes.length} journal entry types`);
+}

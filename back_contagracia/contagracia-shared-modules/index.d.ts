@@ -1,0 +1,17 @@
+export { PrismaClient, Prisma, RiskLevel } from '@prisma/client-master';
+export { PrismaClient as PrismaClientTenant } from '@prisma/client-tenant';
+export * from './shared-audit/src/audit.module';
+export * from './shared-audit/src/decorators/audit.decorator';
+export * from './shared-audit/src/decorators/no-audit.decorator';
+export * from './shared-audit/src/interceptors/audit-logging.interceptor';
+export * from './shared-audit/src/interceptors/audit-context.interceptor';
+export * from './shared-auth/src/auth.module';
+export * from './shared-auth/src/guards/jwt-auth.guard';
+export * from './shared-auth/src/guards/roles.guard';
+export * from './shared-auth/src/guards/permissions.guard';
+export * from './shared-auth/src/decorators/current-user.decorator';
+export * from './shared-auth/src/decorators/roles.decorator';
+export * from './shared-auth/src/decorators/permissions.decorator';
+export * from './shared-database/src/index';
+export * from './shared-validators/src/index';
+export * from './shared-tenant-context/src/index';

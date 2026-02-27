@@ -1,0 +1,43 @@
+import { ActionDef } from '../types';
+
+// ===== MÓDULO 16: ACCOUNTING - Contabilidad (32 permisos) =====
+export const accountingActions: ActionDef[] = [
+    { action_key: 'accounting.view', action_name: 'Acceder a Contabilidad', description: 'Acceder a contabilidad' },
+    { action_key: 'journal_entries.view', action_name: 'Ver Asientos', description: 'Ver asientos' },
+    { action_key: 'journal_entries.create', action_name: 'Crear Asiento', description: 'Crear asiento' },
+    { action_key: 'journal_entries.edit', action_name: 'Editar Asiento', description: 'Editar asiento' },
+    { action_key: 'journal_entries.reverse', action_name: 'Reversar Asiento', description: 'Reversar asiento' },
+    { action_key: 'journal_entries.duplicate', action_name: 'Duplicar Asiento', description: 'Duplicar asiento' },
+    { action_key: 'journal_entries.import', action_name: 'Importar Asientos', description: 'Importar asientos' },
+    { action_key: 'journal_entries.export', action_name: 'Exportar Asientos', description: 'Exportar asientos' },
+    { action_key: 'journal_entries.view_detail', action_name: 'Ver Detalle Asiento', description: 'Ver detalle asiento' },
+    { action_key: 'journal_entries.attachments.upload', action_name: 'Subir Adjuntos', description: 'Subir adjuntos asiento' },
+    { action_key: 'journal_entries.attachments.delete', action_name: 'Eliminar Adjuntos', description: 'Eliminar adjuntos' },
+    { action_key: 'journal_entries.recurrent.view', action_name: 'Ver Asientos Recurrentes', description: 'Ver asientos recurrentes' },
+    { action_key: 'journal_entries.recurrent.create', action_name: 'Crear Recurrente', description: 'Crear asiento recurrente' },
+    { action_key: 'journal_entries.recurrent.edit', action_name: 'Editar Recurrente', description: 'Editar asiento recurrente' },
+    { action_key: 'journal_entries.recurrent.delete', action_name: 'Eliminar Recurrente', description: 'Eliminar recurrente' },
+    { action_key: 'journal_entries.recurrent.execute', action_name: 'Ejecutar Recurrente', description: 'Ejecutar recurrente' },
+    { action_key: 'journal_entries.recurrent.toggle', action_name: 'Activar/Desactivar', description: 'Activar/desactivar recurrente' },
+    { action_key: 'chart_of_accounts.view', action_name: 'Ver Plan de Cuentas', description: 'Ver plan de cuentas' },
+    { action_key: 'chart_of_accounts.create', action_name: 'Crear Cuenta', description: 'Crear cuenta' },
+    { action_key: 'chart_of_accounts.edit', action_name: 'Editar Cuenta', description: 'Editar cuenta' },
+    { action_key: 'chart_of_accounts.delete', action_name: 'Eliminar Cuenta', description: 'Eliminar cuenta' },
+    { action_key: 'chart_of_accounts.import', action_name: 'Importar PUC', description: 'Importar plan de cuentas' },
+    { action_key: 'chart_of_accounts.export', action_name: 'Exportar PUC', description: 'Exportar plan de cuentas' },
+    { action_key: 'account_mapping.view', action_name: 'Ver Mapeo Contable', description: 'Ver mapeo contable' },
+    { action_key: 'account_mapping.configure', action_name: 'Configurar Mapeo', description: 'Configurar mapeo contable' },
+    { action_key: 'account_mapping.auto_detect', action_name: 'Auto-detectar Mapeo', description: 'Auto-detectar mapeo' },
+    { action_key: 'general_ledger.view', action_name: 'Ver Libro Mayor', description: 'Ver libro mayor' },
+    { action_key: 'general_ledger.export', action_name: 'Exportar Libro Mayor', description: 'Exportar libro mayor' },
+    { action_key: 'auxiliary_books.view', action_name: 'Ver Libros Auxiliares', description: 'Ver libros auxiliares' },
+    { action_key: 'accounting.third_parties.assign', action_name: 'Asignar Cuentas a Terceros', description: 'Asignar cuentas contables a terceros' },
+    { action_key: 'accounting.bank_accounts.assign', action_name: 'Asignar Cuentas a Bancos', description: 'Asignar cuentas contables a cuentas bancarias' },
+    { action_key: 'accounting.tax.accounts.assign', action_name: 'Asignar Cuentas a Impuestos', description: 'Asignar cuentas contables a impuestos y retenciones' },
+    // Cierre contable
+    { action_key: 'accounting.closing_accounts.configure', action_name: 'Configurar Cuentas de Cierre', description: 'Configurar cuentas para cierre contable' },
+    { action_key: 'accounting.closing_entries.view', action_name: 'Ver Asientos de Cierre', description: 'Ver asientos generados por cierre contable' },
+    // Saldos iniciales
+    { action_key: 'accounting.opening_balance.import', action_name: 'Importar Saldos Iniciales', description: 'Importar saldos iniciales desde Excel' },
+    { action_key: 'accounting.opening_balance.reverse', action_name: 'Reversar Saldos Iniciales', description: 'Reversar importación de saldos iniciales' },
+  ];

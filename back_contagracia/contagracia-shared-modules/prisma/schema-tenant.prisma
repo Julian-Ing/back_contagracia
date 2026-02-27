@@ -1,0 +1,5577 @@
+// This is your Prisma schema file for TENANT databases (per company)
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@prisma/client-tenant"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_TENANT_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum ThirdPartyType {
+  CLIENT // Cliente
+  SUPPLIER // Proveedor
+  EMPLOYEE // Empleado
+  CONTACT // Contacto (solo desde CRM, no seleccionable en forms)
+  EPS // Entidad Promotora de Salud
+  PENSION_FUND // Fondo de Pensiones
+  ARL // Administradora de Riesgos Laborales
+  COMPENSATION_FUND // Caja de Compensación Familiar
+  SEVERANCE_FUND // Fondo de Cesantías
+  SENA // Servicio Nacional de Aprendizaje
+  ICBF // Instituto Colombiano de Bienestar Familiar
+  CO_OWNER // Copropietario (PH)
+  TENANT // Arrendatario (PH)
+  OTHER // Otro
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+  COST
+  PRODUCTION_COST
+  DEBTOR_ACCOUNTS
+  CREDITOR_ACCOUNTS
+}
+
+enum BankAccountType {
+  SAVINGS // Ahorros
+  CHECKING // Corriente
+  CASH // Caja
+}
+
+enum BankMovementDirection {
+  INCOME  // Ingreso
+  EXPENSE // Egreso
+}
+
+
+enum OvertimeType {
+  HED   // Hora Extra Diurna Ordinaria (25%)
+  HEN   // Hora Extra Nocturna Ordinaria (75%)
+  HEDDF // Hora Extra Diurna Dom/Fest (100%)
+  HENDF // Hora Extra Nocturna Dom/Fest (150%)
+  HRN   // Recargo Nocturno (35%)
+  HRDDF // Recargo Dominical Diurno (75%)
+  HRNDF // Recargo Dominical Nocturno (110%)
+}
+
+enum OvertimeStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  AUTO_APPROVED
+}
+
+enum LeaveType {
+  SICK_LEAVE         // Incapacidad Medica
+  VACATION           // Vacaciones (tomadas)
+  VACATION_MONETIZED // Vacaciones Monetizadas
+  PERSONAL_LEAVE     // Permiso Personal
+  COMPENSATORY_TIME  // Tiempo Compensatorio
+  UNPAID_LEAVE       // Permiso Sin Sueldo
+  MATERNITY_LEAVE    // Licencia Maternidad
+  PATERNITY_LEAVE    // Licencia Paternidad
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum TravelExpenseCategory {
+  BUSINESS_TRIP       // Viaje de negocios
+  TRAINING            // Capacitacion
+  CLIENT_MEETING      // Reunion con cliente
+  CONFERENCE          // Conferencia
+  PROJECT_VISIT       // Visita a proyecto
+  AUDIT               // Auditoria
+  RECRUITMENT         // Reclutamiento
+  MAINTENANCE         // Mantenimiento
+  SALES_VISIT         // Visita comercial
+  OTHER               // Otro
+}
+
+enum TravelExpenseStatus {
+  PENDING                // Pendiente de aprobacion
+  APPROVED               // Aprobado
+  REJECTED               // Rechazado
+  IN_PROGRESS            // En curso (viaje activo)
+  PENDING_LEGALIZATION   // Pendiente de legalizacion
+  LEGALIZED              // Legalizado
+  CANCELLED              // Cancelado
+}
+
+enum PaymentReceiptType {
+  RECEIVABLE // Recibo de Caja (RC)
+  PAYABLE // Comprobante de Egreso (CE)
+  MANUAL // Asiento manual con CxC/CxP (sin consecutivo)
+}
+
+enum PaymentReceiptStatus {
+  VOIDED // Anulado
+  ACTIVE // Activo
+}
+
+enum PaymentReceiptLineKind {
+  DOC // Documento
+  BANK // Banco
+  ACCOUNT // Cuenta
+  PREP_USED // Anticipo usado
+  CXC_CREATED // CxC creada
+  CXP_CREATED // CxP creada
+  PREP_CREATED // Anticipo creado
+}
+
+enum ArApType {
+  RECEIVABLE // Cuenta por Cobrar
+  PAYABLE // Cuenta por Pagar
+}
+
+enum ArApStatus {
+  PENDING // Pendiente
+  PARTIAL // Parcial
+  PAID // Pagado
+  VOIDED // Anulado
+}
+
+enum JournalEntryItemType {
+  DEBIT // Débito
+  CREDIT // Crédito
+}
+
+enum JournalEntryItemRefType {
+  NORMAL              // Línea normal sin referencia específica
+  CXC_CREATED         // Cuenta por cobrar creada
+  CXP_CREATED         // Cuenta por pagar creada
+  CXC_PAID            // Cuenta por cobrar pagada
+  CXP_PAID            // Cuenta por pagar pagada
+  PREP_USED           // Anticipo utilizado
+  PREP_CREATED_CLIENT   // Anticipo de cliente creado
+  PREP_CREATED_SUPPLIER // Anticipo de proveedor creado
+  PREP_CREATED_EMPLOYEE // Anticipo de empleado creado
+}
+
+enum PrepaymentType {
+  CLIENT // Cliente
+  SUPPLIER // Proveedor
+  EMPLOYEE // Empleado
+}
+
+enum PrepaymentStatus {
+  ACTIVE // Activo
+  APPLIED // Aplicado
+  REFUNDED // Devuelto
+  VOIDED // Anulado
+}
+
+enum EmployeeStatus {
+  ACTIVE // Activo
+  INACTIVE // Inactivo
+  ON_LEAVE // En licencia
+  TERMINATED // Retirado
+}
+
+enum TerminationType {
+  MUTUO_ACUERDO         // Mutuo acuerdo (Art. 61 CST)
+  JUSTA_CAUSA_EMPLEADOR // Despido con justa causa por el empleador (Art. 62 CST)
+  JUSTA_CAUSA_TRABAJADOR // Retiro con justa causa por el trabajador (Art. 62 CST)
+  SIN_JUSTA_CAUSA       // Despido sin justa causa (Art. 64 CST - genera indemnización)
+  EXPIRACION_PLAZO      // Expiración del plazo pactado (término fijo)
+  OBRA_COMPLETADA       // Terminación de obra o labor contratada
+  RENUNCIA              // Renuncia voluntaria del trabajador
+}
+
+enum SalaryType {
+  ORDINARIO  // Salario ordinario - prestaciones sociales aparte
+  INTEGRAL   // Salario integral >= 13 SMLMV - factor prestacional incluido (30%)
+}
+  
+// HR Performance - Observaciones y Evaluaciones
+enum ObservationType {
+  RECOGNITION // Reconocimiento
+  FEEDBACK    // Retroalimentación
+  INCIDENT    // Incidente
+  WARNING     // Amonestación
+  ACHIEVEMENT // Logro
+  CONCERN     // Preocupación
+}
+
+enum ObservationSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ObservationStatus {
+  ACTIVE
+  RESOLVED
+  ARCHIVED
+}
+
+enum EvaluationStatus {
+  DRAFT
+  COMPLETED
+  APPROVED
+}
+
+// ============================================
+// SHIFT MANAGEMENT ENUMS
+// ============================================
+
+enum ShiftType {
+  MORNING    // Mañana (ej: 6:00-14:00)
+  AFTERNOON  // Tarde (ej: 14:00-22:00)
+  NIGHT      // Noche (ej: 22:00-06:00)
+  SPLIT      // Partido (ej: 8:00-12:00, 14:00-18:00)
+  CUSTOM     // Personalizado
+}
+
+enum ShiftStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ShiftAssignmentStatus {
+  ASSIGNED
+  CONFIRMED
+  SWAP_REQUESTED
+  SWAPPED
+  CANCELLED
+}
+
+enum ShiftSwapStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum RotationPatternType {
+  WEEKLY     // Rota cada semana
+  BIWEEKLY   // Rota cada 2 semanas
+  MONTHLY    // Rota cada mes
+  CUSTOM     // Patrón personalizado (definido en JSON)
+}
+
+enum ProductMode {
+  PRODUCT     // Producto principal
+  COMBINATION // Combinación de producto (ej: Camisa Roja M)
+}
+
+enum ProductMovementDirection {
+  IN // Entrada
+  OUT // Salida
+}
+
+enum StorageTransferStatus {
+  PENDING // Pendiente de aprobación
+  APPROVED // Aprobada
+  REJECTED // Rechazada
+}
+
+enum ProductTransferStatus {
+  PENDING // Pendiente de aprobación
+  APPROVED // Aprobada
+  REJECTED // Rechazada
+}
+
+enum CostingType {
+  LAST_PURCHASE // Última compra
+  AVERAGE // Promedio ponderado
+}
+
+enum DocType {
+  INVOICE // Factura de venta
+  INVOICE_CREDIT_NOTE // Nota crédito venta
+  INVOICE_DEBIT_NOTE // Nota débito venta
+  INVOICE_POS // Factura POS
+  INVOICE_RECURRENT // Factura recurrente
+  PURCHASE // Compra
+  PURCHASE_CREDIT_NOTE // Nota crédito compra
+  PURCHASE_RECURRENT // Compra recurrente
+  EXPENSE // Gasto / Documento soporte
+  EXPENSE_CREDIT_NOTE // Nota crédito gasto
+  EXPENSE_RECURRENT // Gasto recurrente
+  QUOTE_INVOICE // Cotización de venta
+  QUOTE_CRM // Cotización CRM
+  QUOTE_INVOICE_RECURRENT // Cotización venta recurrente
+  QUOTE_CRM_RECURRENT // Cotización CRM recurrente
+  PURCHASE_ORDER // Orden de compra
+  PURCHASE_ORDER_RECURRENT // Orden de compra recurrente
+}
+
+enum DocumentStatus {
+  DRAFT // Borrador
+  PAID // Pagado
+  PENDING // Pendiente
+}
+
+enum PaymentType {
+  CASH // Contado
+  CREDIT // Crédito
+}
+
+enum SentToApi {
+  NOT_SENT // No enviado
+  SUCCESS // Éxito
+  ERROR // Error
+}
+
+enum OrderType {
+  PURCHASE // Compra
+  EXPENSE // Gasto
+  FIXED_ASSET // Activo fijo
+}
+
+enum AccountingPeriodStatus {
+  OPEN // Abierto
+  CLOSED // Cerrado
+  REOPENED // Reabierto
+}
+
+enum AccountingPeriodActionType {
+  OPEN // Apertura
+  CLOSE // Cierre
+  REOPEN // Reapertura
+  ADJUST // Ajuste saldos iniciales
+}
+
+enum FixedAssetStatus {
+  ACTIVE // Activo
+  INACTIVE // Inactivo
+  DISPOSED // Dado de baja
+}
+
+enum FixedAssetMovementType {
+  CREATION // Alta/Creación del activo
+  DEPRECIATION // Depreciación periódica
+  ADJUSTMENT // Ajuste de valor
+  ANNULMENT // Anulación del activo
+  PURCHASE_RETURN // Devolución de compra
+  DISPOSAL // Baja del activo
+  SALE // Venta del activo
+}
+
+enum DepreciationCalculationBasis {
+  USEFUL_LIFE // Por vida útil en meses
+  PERCENTAGE // Por porcentaje anual
+}
+
+enum BankReconciliationStatus {
+  PENDING // En proceso
+  RECONCILED // Conciliada
+}
+
+enum BankReconciliationItemSource {
+  EXTRACT // Del extracto bancario
+  SYSTEM // Del sistema (journal_entry_items)
+}
+
+enum BankReconciliationItemStatus {
+  PENDING // Sin conciliar
+  MATCHED // Conciliado con otra línea
+  IN_TRANSIT // En tránsito (cheque/depósito pendiente)
+  VOIDED // Anulado (más en sistema que en extracto)
+}
+
+enum TransactionDirection {
+  IN // Ingreso
+  OUT // Egreso
+}
+
+// ---- CRM Enums ----
+
+enum LeadStage {
+  NEW // Nuevo
+  CONTACTED // Contactado
+  QUALIFIED // Calificado
+  LOST // Perdido
+  CONVERTED // Convertido
+}
+
+enum LeadSource {
+  WEB
+  SOCIAL
+  REFERRAL
+  ADS
+  MANUAL
+  WHATSAPP
+  EMAIL
+  FORM
+  IMPORT
+  OTHER
+}
+
+enum CampaignChannel {
+  EMAIL
+  SOCIAL
+  ADS
+  MANUAL
+  WEB
+  WHATSAPP
+}
+
+enum CampaignStatus {
+  ACTIVE
+  PAUSED
+  FINISHED
+}
+
+enum CrmActivityType {
+  CALL
+  MEETING
+  EMAIL
+  TASK
+  NOTE
+  REMINDER
+  WHATSAPP_MESSAGE
+}
+
+enum CrmActivityStatus {
+  PENDING
+  COMPLETED
+  CANCELED
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum CashSessionStatus {
+  OPEN
+  CLOSED
+}
+
+enum CashMovementType {
+  INVOICE // Venta
+  EXPENSE // Gasto/Compra
+}
+
+// ============================================
+// MODULES & PERMISSIONS (Replicados del plan)
+// ============================================
+
+enum PayrollConceptType {
+  ACCRUED // Devengados
+  DEDUCTION // Deducciones
+  PROVISION // Provisiones
+  PARAFISCAL // Parafiscales
+}
+
+model Module {
+  id          String   @id @default(uuid())
+  module_key  String   @unique
+  module_name String
+  description String?
+  icon        String?
+  group       String   @default("Otros")
+  sort_order  Int      @default(0)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  actions SystemAction[]
+
+  @@map("modules")
+}
+
+model SystemAction {
+  id             String    @id @default(uuid())
+  module_id      String
+  action_key     String    @unique
+  action_name    String
+  description    String?
+  is_active      Boolean   @default(true)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  module Module @relation(fields: [module_id], references: [id], onDelete: Cascade)
+
+  @@index([module_id])
+  @@index([action_key])
+  @@map("system_actions")
+}
+
+// ============================================
+// ROLES (Por empresa - personalizables)
+// ============================================
+
+model Role {
+  id          String   @id @default(uuid())
+  role_key    String   @unique // "admin", "cajero", "supervisor_bodega", etc.
+  role_name   String // "Administrador", "Cajero", "Supervisor de Bodega"
+  description String?
+  is_system   Boolean  @default(false) // true = no se puede eliminar (owner, admin)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  // Relations
+  permissions RolePermission[]
+  users       TenantUser[]
+
+  @@map("roles")
+}
+
+// Permisos asignados a cada rol
+model RolePermission {
+  id         String   @id @default(uuid())
+  role_id    String
+  action_key String // "invoices.create", "inventory.adjust", etc.
+  granted    Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  // Relations
+  role Role @relation(fields: [role_id], references: [id], onDelete: Cascade)
+
+  @@unique([role_id, action_key])
+  @@index([role_id])
+  @@map("role_permissions")
+}
+
+// ============================================
+// TENANT USERS & PERMISSIONS
+// Empleados con acceso al sistema
+// ============================================
+
+model TenantUser {
+  id            String  @id @default(uuid())
+  email         String  @unique
+  password_hash String
+  full_name     String
+  phone         String?
+
+  // Rol del usuario en esta empresa
+  role_id String
+
+  // Vinculación a ThirdParty (opcional - si es empleado)
+  third_party_id String? @unique
+
+  // Estado
+  is_active            Boolean @default(true)
+  must_change_password Boolean @default(true)
+
+  // Login tracking
+  last_login_at DateTime?
+  last_login_ip String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  role        Role                   @relation(fields: [role_id], references: [id])
+  third_party ThirdParty?            @relation(fields: [third_party_id], references: [id])
+  permissions TenantUserPermission[]
+
+  // Warehouse relations
+  warehouse_users     WarehouseUser[]
+  transfers_requested StorageTransfer[] @relation("TransferRequestedBy")
+  transfers_approved  StorageTransfer[] @relation("TransferApprovedBy")
+  transfers_rejected  StorageTransfer[] @relation("TransferRejectedBy")
+
+  // Transferencias entre productos
+  product_transfers_requested ProductTransfer[] @relation("ProductTransferRequestedBy")
+  product_transfers_approved  ProductTransfer[] @relation("ProductTransferApprovedBy")
+  product_transfers_rejected  ProductTransfer[] @relation("ProductTransferRejectedBy")
+
+  // Accounting period relations
+  periods_closed         AccountingPeriod[]       @relation("PeriodClosedBy")
+  periods_reopened       AccountingPeriod[]       @relation("PeriodReopenedBy")
+  period_actions_created AccountingPeriodAction[] @relation("PeriodActionCreatedBy")
+
+  // Fixed asset relations
+  fixed_asset_movements_created FixedAssetMovement[] @relation("FixedAssetMovementCreatedBy")
+
+  // Bank reconciliation relations
+  bank_reconciliation_items_matched BankReconciliationItem[] @relation("BankReconciliationMatchedBy")
+
+  // ThirdParty audit relations
+  third_parties_created ThirdParty[] @relation("ThirdPartyCreatedBy")
+  third_parties_updated ThirdParty[] @relation("ThirdPartyUpdatedBy")
+
+  // HR Performance relations
+  created_observations     EmployeeObservation[]   @relation("ObservationCreator")
+  evaluations_as_evaluator PerformanceEvaluation[] @relation("EvaluationEvaluator")
+
+  // CRM relations
+  crm_leads_assigned         CrmLead[]            @relation("CrmLeadAssignedTo")
+  crm_leads_created          CrmLead[]            @relation("CrmLeadCreatedBy")
+  crm_leads_updated          CrmLead[]            @relation("CrmLeadUpdatedBy")
+  crm_opportunities_assigned CrmOpportunity[]     @relation("CrmOpportunityAssignedTo")
+  crm_opportunities_created  CrmOpportunity[]     @relation("CrmOpportunityCreatedBy")
+  crm_opportunities_updated  CrmOpportunity[]     @relation("CrmOpportunityUpdatedBy")
+  crm_campaigns_created      CrmCampaign[]        @relation("CrmCampaignCreatedBy")
+  crm_campaigns_updated      CrmCampaign[]        @relation("CrmCampaignUpdatedBy")
+  crm_activities             CrmActivity[]        @relation("CrmActivityUser")
+  crm_activities_created     CrmActivity[]        @relation("CrmActivityCreatedBy")
+  crm_whatsapp_messages      CrmWhatsappMessage[]        @relation("CrmWhatsappMessageUser")
+  crm_whatsapp_conversations_assigned CrmWhatsappConversation[] @relation("CrmWhatsappConversationAssigned")
+  // POS relations
+  cash_sessions_opened       CashSession[]        @relation("CashSessionOpenedBy")
+  cash_sessions_closed       CashSession[]        @relation("CashSessionClosedBy")
+
+  // Shift management relations
+  shift_schedules_published  ShiftSchedule[]      @relation("ShiftSchedulePublisher")
+  shift_assignments_assigned ShiftAssignment[]    @relation("ShiftAssignmentAssigner")
+  shift_swaps_approved       ShiftSwapRequest[]   @relation("ShiftSwapApprover")
+
+  @@index([role_id])
+  @@map("tenant_users")
+}
+
+// Permisos específicos del usuario (override del rol)
+// Permite dar/quitar permisos específicos a un usuario
+model TenantUserPermission {
+  id             String  @id @default(uuid())
+  tenant_user_id String
+  action_key     String // "invoices.create", "inventory.adjust"
+  granted        Boolean @default(true) // true=otorgar, false=denegar
+
+  // Auditoría
+  granted_by String? // user_id del admin que asignó
+  reason     String? // motivo del permiso especial
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  tenant_user TenantUser @relation(fields: [tenant_user_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_user_id, action_key])
+  @@index([tenant_user_id])
+  @@map("tenant_user_permissions")
+}
+
+// ============================================
+// PARAMETRIC TABLES (Replicadas desde Master)
+// Estas tablas se copian desde Master al crear el tenant
+// Son READ-ONLY en el tenant (no se modifican)
+// ============================================
+
+// Geolocalización
+model Department {
+  id         String   @id @default(uuid())
+  country_id String
+  code       String   @unique
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  municipalities Municipality[]
+  third_parties  ThirdParty[]
+
+  @@index([country_id])
+  @@map("departments")
+}
+
+model Municipality {
+  id            String   @id @default(uuid())
+  department_id String
+  code          String   @unique
+  name          String
+  dian_code     String?
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+
+  department    Department   @relation(fields: [department_id], references: [id])
+  third_parties ThirdParty[]
+
+  @@index([department_id])
+  @@map("municipalities")
+}
+
+// Tipos DIAN
+model TypeDocumentIdentification {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  third_parties ThirdParty[]
+
+  @@map("type_document_identifications")
+}
+
+model TypeOrganization {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  third_parties ThirdParty[]
+
+  @@map("type_organizations")
+}
+
+model TypeRegime {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  third_parties ThirdParty[]
+
+  @@map("type_regimes")
+}
+
+model TypeLiability {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  category    String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  third_parties ThirdParty[]
+
+  @@map("type_liabilities")
+}
+
+// Catálogos
+model Bank {
+  id         String   @id @default(uuid())
+  code       String?  @unique
+  name       String
+  country    String   @default("CO")
+  swift_code String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  bank_accounts BankAccount[]
+
+  @@map("banks")
+}
+
+model PaymentMethod {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  third_parties           ThirdParty[]           @relation("ThirdPartyPaymentMethod")
+  company_payment_methods CompanyPaymentMethod[]
+
+  @@map("payment_methods")
+}
+
+// Métodos de pago personalizados del tenant
+model CompanyPaymentMethod {
+  id                String   @id @default(uuid())
+  payment_method_id String // FK a PaymentMethod (código DIAN)
+  consecutive       String?  @unique
+  name              String // Nombre personalizado: "Nequi", "Daviplata", etc.
+  description       String?
+  is_active         Boolean  @default(true)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  payment_method         PaymentMethod        @relation(fields: [payment_method_id], references: [id])
+  documents         Document[]           @relation("DocumentPaymentMethod")
+  document_payments DocumentPayment[]
+  prepayments       Prepayment[]
+  payment_receipt_lines  PaymentReceiptLine[]
+
+  @@map("company_payment_methods")
+}
+
+model ProductUnit {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  products Product[]
+
+  @@map("product_units")
+}
+
+model Tax {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  rate              Decimal  @db.Decimal(8, 4)
+  per_unit_amount   Decimal? @db.Decimal(19, 4)   // monto fijo por unidad (solo tax_type_id=10)
+  tax_type_id Int      @default(1) // FK a TaxType (1=IVA, 5=ReteIVA, 6=ReteRenta, 7=ReteICA)
+  description String?
+  is_cost_tax Boolean  @default(false) // true = usa cuenta costo en vez de compras (solo IVA)
+  is_system   Boolean  @default(false) // true = seedeado, no se puede eliminar
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  // Cuentas contables para impuestos
+  tax_sales_account_code     String? // Cuenta IVA en ventas (ej: 240801)
+  tax_purchases_account_code String? // Cuenta IVA en compras (ej: 240802)
+  tax_cost_account_code      String? // Cuenta IVA en costos/gastos
+
+  // Cuentas contables para retenciones
+  withholding_sales_account_code     String? // Retención en ventas (a favor)
+  withholding_purchases_account_code String? // Retención en compras (por pagar)
+
+  tax_type              TaxType  @relation(fields: [tax_type_id], references: [id])
+  products              Product[]
+  document_item_taxes   DocumentItemTax[]
+  document_withholdings DocumentWithholding[]
+
+  tax_sales_account             ChartOfAccount? @relation("TaxSalesAccount", fields: [tax_sales_account_code], references: [code])
+  tax_purchases_account         ChartOfAccount? @relation("TaxPurchasesAccount", fields: [tax_purchases_account_code], references: [code])
+  tax_cost_account              ChartOfAccount? @relation("TaxCostAccount", fields: [tax_cost_account_code], references: [code])
+  withholding_sales_account     ChartOfAccount? @relation("WithholdingSalesAccount", fields: [withholding_sales_account_code], references: [code])
+  withholding_purchases_account ChartOfAccount? @relation("WithholdingPurchasesAccount", fields: [withholding_purchases_account_code], references: [code])
+
+  @@map("taxes")
+}
+
+model TaxType {
+  id          Int      @id // 1, 4, 5, 6, etc. (IDs fijos DIAN)
+  code        String   @unique // "01" (IVA), "04" (INC), "05" (ReteIVA), etc.
+  name        String // "IVA", "INC", "ReteIVA"
+  description String? // "Impuesto sobre las Ventas"
+  is_tax      Boolean  @default(true) // true = impuesto, false = retención
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  taxes Tax[]
+
+  @@map("tax_types")
+}
+
+// Tipos de consecutivos (replicado desde master)
+model ConsecutiveType {
+  type            String  @id // invoice, purchase, journal_entry, etc.
+  default_prefix  String  // FV, CO, JE, etc.
+  description     String  // Factura de Venta, Compra, Asiento Contable, etc.
+  table_name      String? // Nombre de la tabla Prisma: BankMovement, JournalEntry
+  field_name      String  @default("consecutive") // Campo destino
+  condition_field String? // Campo para condición (ej: type_key)
+  condition_value String? // Valor de la condición (ej: sale_invoice)
+
+  consecutive Consecutive?
+
+  @@map("consecutive_types")
+}
+
+// Consecutivos por empresa (inicializado desde ConsecutiveType)
+model Consecutive {
+  type        String @id // FK a consecutive_types.type
+  last_number Int    @default(0)
+  prefix      String // Inicializado con default_prefix, editable por empresa
+  padding     Int    @default(4) // Cantidad de dígitos (ej: 4 = 0001)
+
+  consecutive_type ConsecutiveType @relation(fields: [type], references: [type])
+
+  @@map("consecutives")
+}
+
+// Tipos de movimiento de inventario (replicado desde master)
+model ProductMovementType {
+  key  String @id // sale, purchase, transfer, adjustment, etc.
+  name String // Venta, Compra, Transferencia, Ajuste, etc.
+
+  movements ProductMovement[]
+
+  @@map("product_movement_types")
+}
+
+// Paramétricas de Nómina (solo en Tenant)
+model TypeContract {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  employee_contracts EmployeeContract[] @relation("ContractTypeContract")
+
+  @@map("type_contracts")
+}
+
+model Event {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  @@map("events")
+}
+
+model TypeDocument {
+  id             String   @id @default(uuid())
+  code           String   @unique
+  name           String
+  cufe_algorithm String?
+  prefix         String?
+  display_order  Int?
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+
+  resolutions Resolution[]
+
+  @@map("type_documents")
+}
+
+model TypeOperation {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  documents Document[]
+
+  @@map("type_operations")
+}
+
+model Resolution {
+  id                        String    @id @default(uuid())
+  type_document_id          String
+  prefix                    String    @db.VarChar(10)
+  resolution_number         String
+  resolution_date           DateTime  @db.Date
+  technical_key             String?
+  range_from                BigInt
+  range_to                  BigInt
+  last_external_consecutive Int?      @default(0)
+  date_from                 DateTime? @db.Date
+  date_to                   DateTime? @db.Date
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  type_document  TypeDocument   @relation(fields: [type_document_id], references: [id])
+  documents      Document[]
+  cash_registers CashRegister[]
+
+  @@index([type_document_id])
+  @@index([is_active])
+  @@map("resolutions")
+}
+
+model TypeRejection {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  @@map("type_rejections")
+}
+
+model TypePayrollAdjustNote {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  @@map("type_payroll_adjust_notes")
+}
+
+model WorkerSubtypeRule {
+  id                       String   @id @default(uuid())
+  sub_type_worker_id       String   @unique
+  health_employee_rate     Decimal? @db.Decimal(8, 4)
+  health_employer_rate     Decimal? @db.Decimal(8, 4)
+  pension_employee_rate    Decimal? @db.Decimal(8, 4)
+  pension_employer_rate    Decimal? @db.Decimal(8, 4)
+  health_employee_pays     Boolean  @default(true)
+  pension_employee_pays    Boolean  @default(true)
+  ccf_applies              Boolean  @default(true)
+  icbf_applies             Boolean  @default(true)
+  sena_applies             Boolean  @default(true)
+  arl_applies              Boolean  @default(true)
+  fsp_applies              Boolean  @default(true)
+  fsp_special_rate         Decimal? @db.Decimal(8, 4)
+  ibc_min_smmlv_percentage Decimal? @db.Decimal(8, 4)
+  legal_notes              String?
+  ui_display_name          String?
+  ui_impacts               Json?
+  ui_color                 String?  @default("amber")
+  is_active                Boolean  @default(true)
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
+
+  @@map("worker_subtype_rules")
+}
+
+model TaxObligationType {
+  id                            String   @id @default(uuid())
+  code                          String   @unique
+  name                          String
+  description                   String?
+  category                      String   @default("nacional")
+  periodicity                   String
+  nit_digit_type                String   @default("last_1")
+  applies_to_gran_contribuyente Boolean  @default(false)
+  applies_to_persona_juridica   Boolean  @default(true)
+  applies_to_persona_natural    Boolean  @default(true)
+  applies_to_rst                Boolean  @default(false)
+  has_multiple_installments     Boolean  @default(false)
+  installment_count             Int      @default(1)
+  is_active                     Boolean  @default(true)
+  display_order                 Int      @default(0)
+  created_at                    DateTime @default(now())
+  updated_at                    DateTime @updatedAt
+
+  @@map("tax_obligation_types")
+}
+
+model TypeWorker {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  employee_contracts EmployeeContract[] @relation("ContractWorkerType")
+
+  @@map("type_workers")
+}
+
+model SubTypeWorker {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  employee_contracts EmployeeContract[] @relation("ContractWorkerSubtype")
+
+  @@map("sub_type_workers")
+}
+
+model ArlRisk {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  name       String
+  rate       Decimal  @db.Decimal(8, 4)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  third_parties     ThirdParty[]
+
+  @@map("arl_risk")
+}
+
+// ============================================
+// THIRD PARTIES (Entidad unificada)
+// Un third party puede ser: Cliente, Proveedor, Empleado, EPS, ARL, etc.
+// Un mismo third party puede tener múltiples roles
+// ============================================
+
+model ThirdParty {
+  id String @id @default(uuid())
+
+  // ========== IDENTIFICACIÓN ==========
+  name                  String?
+  identification_number String?
+  dv                    String?
+
+  // FKs a tablas paramétricas
+  type_document_identification_id String?
+  type_organization_id            String?
+  type_regime_id                  String?
+  type_liability_id               String?
+  department_id                   String?
+  municipality_id                 String?
+
+  // ========== CONTACTO ==========
+  email   String?
+  phone   String?
+  address String?
+
+  // ========== ROLES ==========
+  roles ThirdPartyType[]
+
+  // ========== PERSONA NATURAL ==========
+  first_name     String?
+  second_name    String?
+  first_surname  String?
+  second_surname String?
+
+  // ========== TAX INFO ==========
+  codigo_pila String?
+
+  // ========== VINCULACIÓN USUARIO ==========
+  // La relación es inversa: TenantUser.third_party_id -> ThirdParty.id
+  // Ver relación tenant_user abajo
+
+  // ========== CUENTAS CONTABLES ==========
+  cxc_account_code String?
+  cxp_account_code String?
+
+  // ========== DATOS DE EMPLEADO (solo si roles incluye EMPLOYEE) ==========
+  // Datos laborales
+  hire_date         DateTime?
+  payment_method_id String?
+  arl_risk_class_id String?
+
+  // Seguridad social (FKs a otros ThirdParty tipo EPS, ARL, etc.)
+  eps_id               String?
+  pension_fund_id      String?
+  arl_id               String?
+  compensation_fund_id String?
+  severance_fund_id    String?
+
+  // Datos bancarios del empleado
+  bank_name           String?
+  bank_account_type   BankAccountType?
+  bank_account_number String?
+
+  // Centro de costos
+  cost_center_id String?
+
+  // Comisión
+  commission_rate Decimal? @db.Decimal(8, 4)
+
+  // Director/Supervisor
+  director_id String?
+
+  // Flags de empleado
+  is_administrative Boolean         @default(false)
+  employee_status   EmployeeStatus?
+
+  // Referencias al registro actual de contrato y salario (solo EMPLOYEE)
+  current_contract_id String? @unique
+  current_salary_id   String? @unique
+
+  // ========== DATOS CRM (solo si roles incluye CONTACT) ==========
+  company_name             String?
+  whatsapp_number          String?   @unique
+  whatsapp_subscribed      Boolean   @default(false)
+  last_whatsapp_message_at DateTime?
+  crm_tags                 String[]
+  notes                    String?   @db.Text
+  birth_date               DateTime? @db.Date
+  segment                  String?
+
+  // GDPR / Consentimiento
+  consent_ip        String?
+  consent_timestamp DateTime?
+  consent_method    String?
+
+  // ========== ESTADO Y TIMESTAMPS ==========
+  is_active  Boolean   @default(true)
+  deleted_at DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  // Auditoría
+  created_by String?
+  updated_by String?
+
+  // ========== RELATIONS ==========
+  // Usuario del sistema (si tiene acceso)
+  tenant_user TenantUser?
+
+  // Paramétricas
+  type_document_identification TypeDocumentIdentification? @relation(fields: [type_document_identification_id], references: [id])
+  type_organization            TypeOrganization?           @relation(fields: [type_organization_id], references: [id])
+  type_regime                  TypeRegime?                 @relation(fields: [type_regime_id], references: [id])
+  type_liability               TypeLiability?              @relation(fields: [type_liability_id], references: [id])
+  department                   Department?                 @relation(fields: [department_id], references: [id])
+  municipality                 Municipality?               @relation(fields: [municipality_id], references: [id])
+
+  // Paramétricas de empleado
+  payment_method PaymentMethod? @relation("ThirdPartyPaymentMethod", fields: [payment_method_id], references: [id])
+  arl_risk_class ArlRisk?       @relation(fields: [arl_risk_class_id], references: [id])
+
+  // Cuentas contables
+  cxc_account ChartOfAccount? @relation("ThirdPartyCxcAccount", fields: [cxc_account_code], references: [code])
+  cxp_account ChartOfAccount? @relation("ThirdPartyCxpAccount", fields: [cxp_account_code], references: [code])
+  cost_center CostCenter?     @relation(fields: [cost_center_id], references: [id])
+
+  // Seguridad social (self-relations a otros third parties)
+  eps               ThirdParty? @relation("ThirdPartyEps", fields: [eps_id], references: [id])
+  pension_fund      ThirdParty? @relation("ThirdPartyPension", fields: [pension_fund_id], references: [id])
+  arl               ThirdParty? @relation("ThirdPartyArl", fields: [arl_id], references: [id])
+  compensation_fund ThirdParty? @relation("ThirdPartyCompensation", fields: [compensation_fund_id], references: [id])
+  severance_fund    ThirdParty? @relation("ThirdPartySeverance", fields: [severance_fund_id], references: [id])
+
+  // Empleados que usan este third party como EPS, ARL, etc.
+  employees_eps          ThirdParty[] @relation("ThirdPartyEps")
+  employees_pension      ThirdParty[] @relation("ThirdPartyPension")
+  employees_arl          ThirdParty[] @relation("ThirdPartyArl")
+  employees_compensation ThirdParty[] @relation("ThirdPartyCompensation")
+  employees_severance    ThirdParty[] @relation("ThirdPartySeverance")
+
+  // Jerarquía de empleados
+  director     ThirdParty?  @relation("ThirdPartyDirector", fields: [director_id], references: [id])
+  subordinates ThirdParty[] @relation("ThirdPartyDirector")
+
+  // AR/AP, Payments, Prepayments
+  ar_ap_records       ArAp[]
+  payment_receipts    PaymentReceipt[]
+  prepayments         Prepayment[]
+  journal_entry_items JournalEntryItem[]
+
+  // CRM (solo si roles incluye CONTACT)
+  crm_leads                  CrmLead[]                 @relation("CrmLeadContact")
+  crm_activities             CrmActivity[]             @relation("CrmActivityContact")
+  crm_opportunities          CrmOpportunity[]          @relation("CrmOpportunityContact")
+  crm_form_submissions       CrmFormSubmission[]       @relation("CrmFormSubmissionContact")
+  crm_email_sends            EmailSend[]               @relation("CrmEmailSendContact")
+  crm_whatsapp_conversations CrmWhatsappConversation[] @relation("CrmWhatsappConversationContact")
+  crm_whatsapp_messages      CrmWhatsappMessage[]      @relation("CrmWhatsappMessageContact")
+  crm_tag_assignments        CrmContactTagAssignment[] @relation("CrmTagAssignmentContact")
+  crm_documents              Document[]                @relation("ContactDocuments")
+
+  // Auditoría
+  created_by_user TenantUser? @relation("ThirdPartyCreatedBy", fields: [created_by], references: [id])
+  updated_by_user TenantUser? @relation("ThirdPartyUpdatedBy", fields: [updated_by], references: [id])
+
+  // PH - Pólizas de seguro (SUPPLIER = aseguradora)
+  insurance_policies         PhInsurancePolicy[]         @relation("InsurancePolicyThirdParty")
+  insurance_policy_insurers  PhInsurancePolicyInsurer[]   @relation("InsurancePolicyInsurerThirdParty")
+
+  // PH - Planes de mantenimiento (SUPPLIER = proveedor mantenimiento)
+  maintenance_plans          PhMaintenancePlan[]          @relation("MaintenancePlanProvider")
+  maintenance_logs           PhMaintenanceLog[]           @relation("MaintenanceLogProvider")
+
+  // POS
+  cash_movements CashMovement[]
+
+  // HR - Contratos, Salarios y registros directos (solo EMPLOYEE)
+  current_contract           EmployeeContract?        @relation("CurrentContract", fields: [current_contract_id], references: [id])
+  current_salary             SalaryHistory?            @relation("CurrentSalary", fields: [current_salary_id], references: [id])
+  contracts                  EmployeeContract[]        @relation("ThirdPartyContracts")
+  salary_history             SalaryHistory[]           @relation("ThirdPartySalaries")
+  attendance_records         AttendanceRecord[]        @relation("ThirdPartyAttendance")
+  overtime_records_employee  OvertimeRecord[]          @relation("ThirdPartyOvertime")
+  overtime_approvals         OvertimeRecord[]          @relation("OvertimeApprover")
+  leave_requests_employee    LeaveRequest[]            @relation("ThirdPartyLeaves")
+  leave_approvals            LeaveRequest[]            @relation("LeaveApprover")
+  travel_expenses            EmployeeTravelExpense[]   @relation("ThirdPartyTravelExpenses")
+  travel_expense_approvals   EmployeeTravelExpense[]   @relation("TravelExpenseApprover")
+  payroll_details            PayrollSettlementDetail[] @relation("ThirdPartyPayrollDetails")
+  employee_observations      EmployeeObservation[]     @relation("ThirdPartyObservations")
+  performance_evaluations    PerformanceEvaluation[]   @relation("ThirdPartyEvaluations")
+
+  // HR - Turnos (solo EMPLOYEE)
+  shift_assignments          ShiftAssignment[]         @relation("ThirdPartyShiftAssignments")
+  shift_swap_requests        ShiftSwapRequest[]        @relation("ShiftSwapRequester")
+  shift_swap_targets         ShiftSwapRequest[]        @relation("ShiftSwapTarget")
+
+  @@index([type_document_identification_id])
+  @@index([type_organization_id])
+  @@index([department_id])
+  @@index([municipality_id])
+  @@index([roles])
+  @@index([employee_status])
+  @@index([cost_center_id])
+  @@index([segment])
+  @@index([whatsapp_number])
+  @@index([created_by])
+  @@index([updated_by])
+  @@map("third_parties")
+}
+
+// ============================================
+// EMPLOYEE CONTRACTS & SALARY HISTORY
+// Historial de contratos y salarios vinculados a ThirdParty (rol EMPLOYEE)
+// ============================================
+
+model EmployeeContract {
+  id              String    @id @default(uuid())
+  third_party_id  String
+  contract_number String?   // CTR-001
+  contract_type_id    String?
+  worker_type_id      String?
+  worker_subtype_id   String?
+  position            String?   // Cargo/función del empleado
+  probation_days      Int?      // Días de periodo de prueba (0 = sin prueba, null = no definido)
+  includes_transport  Boolean   @default(true) // Contrato estipula pago de auxilio de transporte
+  start_date          DateTime  @db.Date
+  end_date            DateTime? @db.Date // null = indefinido
+  is_current          Boolean   @default(true)
+  termination_type    TerminationType? // Tipo de terminación (solo al cerrar contrato)
+  termination_reason  String?
+  observations        String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relaciones
+  third_party    ThirdParty    @relation("ThirdPartyContracts", fields: [third_party_id], references: [id], onDelete: Cascade)
+  contract_type  TypeContract? @relation("ContractTypeContract", fields: [contract_type_id], references: [id])
+  worker_type    TypeWorker?   @relation("ContractWorkerType", fields: [worker_type_id], references: [id])
+  worker_subtype SubTypeWorker? @relation("ContractWorkerSubtype", fields: [worker_subtype_id], references: [id])
+  salary_history SalaryHistory[] @relation("ContractSalaries")
+
+  // Relación inversa para current_contract_id
+  current_for ThirdParty? @relation("CurrentContract")
+
+  @@index([third_party_id])
+  @@index([is_current])
+  @@map("employee_contracts")
+}
+
+model SalaryHistory {
+  id                       String      @id @default(uuid())
+  third_party_id           String
+  contract_id              String?     // FK al contrato bajo el cual aplica este salario
+  salary                   Decimal     @db.Decimal(15, 4) // Salario mensual total
+  salary_type              SalaryType  @default(ORDINARIO)
+  transportation_allowance Decimal?    @db.Decimal(15, 4) // Monto real del auxilio (ej: 200000), null = no aplica
+  variable_salary          Boolean     @default(false) // Si tiene componente variable (comisiones)
+  effective_date           DateTime    @db.Date
+  end_date                 DateTime?   @db.Date // null = vigente
+  is_current               Boolean     @default(true)
+  reason                   String? // "Ingreso", "Aumento anual", "Promoción"
+
+  created_at DateTime @default(now())
+
+  // Relaciones
+  third_party ThirdParty        @relation("ThirdPartySalaries", fields: [third_party_id], references: [id], onDelete: Cascade)
+  contract    EmployeeContract? @relation("ContractSalaries", fields: [contract_id], references: [id])
+
+  // Relación inversa para current_salary_id
+  current_for ThirdParty? @relation("CurrentSalary")
+
+  @@index([third_party_id])
+  @@index([contract_id])
+  @@index([is_current])
+  @@map("salary_history")
+}
+
+// ============================================
+// TIME & ATTENDANCE
+// ============================================
+
+model AttendanceRecord {
+  id              String    @id @default(uuid())
+  third_party_id  String
+  date            DateTime  @db.Date
+  check_in        DateTime?
+  check_out       DateTime?
+  worked_hours    Decimal?  @db.Decimal(5, 2)
+  notes           String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relaciones
+  third_party ThirdParty @relation("ThirdPartyAttendance", fields: [third_party_id], references: [id], onDelete: Cascade)
+
+  @@unique([third_party_id, date])
+  @@index([date])
+  @@map("attendance_records")
+}
+
+model OvertimeRecord {
+  id              String         @id @default(uuid())
+  third_party_id  String
+  overtime_date       DateTime       @db.Date
+  start_time          String         // HH:mm formato
+  end_time            String         // HH:mm formato
+  total_hours         Decimal        @db.Decimal(5, 2)
+  overtime_type       OvertimeType
+  payroll_code        String         // "HEDs", "HENs", etc.
+  surcharge_pct       Decimal        @db.Decimal(5, 2) // 25.00, 75.00, etc.
+  base_hourly_rate    Decimal?       @db.Decimal(15, 4)
+  calculated_amount   Decimal?       @db.Decimal(15, 4)
+  reason              String
+  notes               String?
+  status              OvertimeStatus @default(REQUESTED)
+  approved_by_id      String?
+  approved_at         DateTime?
+  rejection_reason    String?
+  cost_center_id      String?
+  is_paid             Boolean        @default(false)
+  paid_at             DateTime?
+  created_by_id       String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relaciones
+  third_party  ThirdParty   @relation("ThirdPartyOvertime", fields: [third_party_id], references: [id], onDelete: Cascade)
+  approved_by  ThirdParty?  @relation("OvertimeApprover", fields: [approved_by_id], references: [id])
+  cost_center  CostCenter?  @relation("OvertimeCostCenter", fields: [cost_center_id], references: [id])
+
+  @@index([third_party_id])
+  @@index([overtime_date])
+  @@index([status])
+  @@map("overtime_records")
+}
+
+// ============================================
+// LEAVES / VACACIONES Y AUSENCIAS
+// ============================================
+
+model LeaveRequest {
+  id              String      @id @default(uuid())
+  third_party_id  String
+  leave_type      LeaveType
+  start_date      DateTime    @db.Date
+  end_date        DateTime    @db.Date
+  days_requested  Int
+  reason          String?
+  status          LeaveStatus @default(PENDING)
+  approved_by_id  String?
+  approved_at     DateTime?
+  rejection_reason String?
+  admin_notes     String?
+  source          String      @default("internal") // "internal" | "public"
+  created_by_id   String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relaciones
+  third_party  ThirdParty   @relation("ThirdPartyLeaves", fields: [third_party_id], references: [id], onDelete: Cascade)
+  approved_by  ThirdParty?  @relation("LeaveApprover", fields: [approved_by_id], references: [id])
+
+  @@index([third_party_id])
+  @@index([status])
+  @@index([start_date, end_date])
+  @@index([leave_type])
+  @@map("leave_requests")
+}
+
+// ============================================
+// EMPLOYEE TRAVEL EXPENSES (VIATICOS)
+// ============================================
+
+model EmployeeTravelExpense {
+  id                String                @id @default(uuid())
+  third_party_id    String
+  expense_code      String?               // VIA-0001
+  expense_category  TravelExpenseCategory @default(BUSINESS_TRIP)
+  travel_purpose    String
+  destination       String
+  start_date        DateTime              @db.Date
+  end_date          DateTime              @db.Date
+  assigned_amount   Decimal               @db.Decimal(19, 4)
+  reported_amount   Decimal?              @db.Decimal(19, 4)
+  amount_difference Decimal?              @db.Decimal(19, 4)
+  status            TravelExpenseStatus   @default(PENDING)
+  approved_by_id    String?
+  approved_at       DateTime?
+  rejection_reason  String?
+  admin_notes       String?
+  notes             String?
+  reported_at       DateTime?
+  created_by_id     String?
+  cost_center_id    String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relaciones
+  third_party  ThirdParty   @relation("ThirdPartyTravelExpenses", fields: [third_party_id], references: [id], onDelete: Cascade)
+  approved_by  ThirdParty?  @relation("TravelExpenseApprover", fields: [approved_by_id], references: [id])
+  cost_center  CostCenter?  @relation("TravelExpenseCostCenter", fields: [cost_center_id], references: [id])
+
+  @@index([third_party_id])
+  @@index([status])
+  @@index([start_date, end_date])
+  @@index([expense_category])
+  @@map("employee_travel_expenses")
+}
+
+// ============================================
+// HR PERFORMANCE - Observaciones y Evaluaciones
+// ============================================
+
+model EmployeeObservation {
+  id               String              @id @default(uuid())
+  third_party_id   String
+  title            String
+  description      String
+  observation_date DateTime            @db.Date
+  observation_type ObservationType
+  severity         ObservationSeverity @default(MEDIUM)
+  status           ObservationStatus   @default(ACTIVE)
+  action_required  String?
+  follow_up_date   DateTime?           @db.Date
+  created_by_id    String              // FK → TenantUser.id (quien registra)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relaciones
+  third_party ThirdParty @relation("ThirdPartyObservations", fields: [third_party_id], references: [id], onDelete: Cascade)
+  created_by  TenantUser @relation("ObservationCreator", fields: [created_by_id], references: [id])
+
+  @@index([third_party_id])
+  @@index([observation_type])
+  @@index([status])
+  @@index([observation_date])
+  @@index([created_by_id])
+  @@map("employee_observations")
+}
+
+model PerformanceEvaluation {
+  id                    String           @id @default(uuid())
+  third_party_id        String
+  evaluation_period     String           // "2026-Q1", "2026-01", etc.
+  evaluation_date       DateTime         @db.Date
+  status                EvaluationStatus @default(DRAFT)
+
+  // Scores individuales (1-5 entero)
+  attendance_score      Int?
+  performance_score     Int?
+  attitude_score        Int?
+
+  // Score general (promedio ponderado, Decimal para precisión)
+  overall_score         Decimal?         @db.Decimal(3, 2)
+
+  // Campos narrativos
+  strengths               String?
+  areas_for_improvement   String?
+  goals_next_period       String?
+  evaluator_comments      String?
+  employee_comments       String?
+
+  evaluator_id String // FK → TenantUser.id (quien evalúa)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relaciones
+  third_party ThirdParty @relation("ThirdPartyEvaluations", fields: [third_party_id], references: [id], onDelete: Cascade)
+  evaluator   TenantUser @relation("EvaluationEvaluator", fields: [evaluator_id], references: [id])
+
+  @@index([third_party_id])
+  @@index([evaluation_period])
+  @@index([status])
+  @@index([evaluator_id])
+  @@map("performance_evaluations")
+}
+
+// ============================================
+// SHIFT MANAGEMENT
+// Gestión de turnos, horarios y rotaciones
+// ============================================
+
+model ShiftTemplate {
+  id          String    @id @default(uuid())
+  name        String    // "Turno Mañana", "Turno Noche", etc.
+  code        String?   // "TM-01"
+  shift_type  ShiftType @default(CUSTOM)
+  start_time  String    // HH:mm formato 24h (ej: "06:00")
+  end_time    String    // HH:mm formato 24h (ej: "14:00")
+  break_start String?   // HH:mm inicio del descanso (ej: "10:00")
+  break_end   String?   // HH:mm fin del descanso (ej: "10:30")
+  break_minutes Int     @default(0) // Minutos totales de descanso
+  total_hours Decimal   @db.Decimal(4, 2) // Horas netas de trabajo
+  color       String?   // Hex color para UI (ej: "#3B82F6")
+  description String?
+  is_overnight Boolean  @default(false) // Turno cruza medianoche
+  is_active   Boolean   @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relaciones
+  assignments         ShiftAssignment[]
+  rotation_details    ShiftRotationDetail[]
+
+  @@map("shift_templates")
+}
+
+model ShiftSchedule {
+  id            String      @id @default(uuid())
+  name          String      // "Programación Febrero 2026"
+  period_start  DateTime    @db.Date // Inicio del periodo
+  period_end    DateTime    @db.Date // Fin del periodo
+  status        ShiftStatus @default(DRAFT)
+  notes         String?
+  published_at  DateTime?
+  published_by  String?     // TenantUser id
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relaciones
+  publisher   TenantUser?      @relation("ShiftSchedulePublisher", fields: [published_by], references: [id])
+  assignments ShiftAssignment[]
+
+  @@index([status])
+  @@index([period_start, period_end])
+  @@map("shift_schedules")
+}
+
+model ShiftAssignment {
+  id                String                @id @default(uuid())
+  third_party_id    String                // Empleado asignado
+  shift_template_id String                // Plantilla de turno
+  schedule_id       String?               // Programación a la que pertenece (opcional)
+  date              DateTime              @db.Date // Fecha del turno
+  custom_start_time String?               // Override hora inicio (si difiere de plantilla)
+  custom_end_time   String?               // Override hora fin
+  status            ShiftAssignmentStatus @default(ASSIGNED)
+  notes             String?
+  assigned_by       String?               // TenantUser que asignó
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relaciones
+  third_party    ThirdParty    @relation("ThirdPartyShiftAssignments", fields: [third_party_id], references: [id], onDelete: Cascade)
+  shift_template ShiftTemplate @relation(fields: [shift_template_id], references: [id])
+  schedule       ShiftSchedule? @relation(fields: [schedule_id], references: [id], onDelete: SetNull)
+  assigner       TenantUser?   @relation("ShiftAssignmentAssigner", fields: [assigned_by], references: [id])
+
+  // Solicitudes de intercambio donde este turno es el ofrecido
+  swap_requests_as_requester ShiftSwapRequest[] @relation("SwapRequesterAssignment")
+  swap_requests_as_target    ShiftSwapRequest[] @relation("SwapTargetAssignment")
+
+  @@unique([third_party_id, date]) // Un empleado = un turno por día
+  @@index([shift_template_id])
+  @@index([schedule_id])
+  @@index([date])
+  @@index([status])
+  @@map("shift_assignments")
+}
+
+model ShiftSwapRequest {
+  id                      String          @id @default(uuid())
+  requester_id            String          // Empleado que solicita el cambio
+  target_id               String          // Empleado con quien quiere intercambiar
+  requester_assignment_id String          // Turno del solicitante
+  target_assignment_id    String          // Turno objetivo
+  reason                  String?
+  status                  ShiftSwapStatus @default(PENDING)
+  approved_by             String?         // TenantUser que aprobó/rechazó
+  approved_at             DateTime?
+  rejection_reason        String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relaciones
+  requester            ThirdParty      @relation("ShiftSwapRequester", fields: [requester_id], references: [id], onDelete: Cascade)
+  target               ThirdParty      @relation("ShiftSwapTarget", fields: [target_id], references: [id], onDelete: Cascade)
+  requester_assignment ShiftAssignment @relation("SwapRequesterAssignment", fields: [requester_assignment_id], references: [id])
+  target_assignment    ShiftAssignment @relation("SwapTargetAssignment", fields: [target_assignment_id], references: [id])
+  approver             TenantUser?     @relation("ShiftSwapApprover", fields: [approved_by], references: [id])
+
+  @@index([requester_id])
+  @@index([target_id])
+  @@index([status])
+  @@map("shift_swap_requests")
+}
+
+model ShiftRotationPattern {
+  id          String              @id @default(uuid())
+  name        String              // "Rotación Semanal Día/Noche"
+  description String?
+  pattern_type RotationPatternType @default(WEEKLY)
+  cycle_days  Int                 @default(7) // Días del ciclo
+  is_active   Boolean             @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relaciones
+  details ShiftRotationDetail[]
+
+  @@map("shift_rotation_patterns")
+}
+
+model ShiftRotationDetail {
+  id                  String @id @default(uuid())
+  rotation_pattern_id String
+  day_in_cycle        Int    // Día dentro del ciclo (1, 2, 3...)
+  shift_template_id   String // Qué turno aplica ese día
+  is_rest_day         Boolean @default(false) // Es día de descanso
+
+  // Relaciones
+  rotation_pattern ShiftRotationPattern @relation(fields: [rotation_pattern_id], references: [id], onDelete: Cascade)
+  shift_template   ShiftTemplate        @relation(fields: [shift_template_id], references: [id])
+
+  @@unique([rotation_pattern_id, day_in_cycle])
+  @@map("shift_rotation_details")
+}
+
+// ============================================
+// COST CENTERS (recursive hierarchy)
+// ============================================
+
+model CostCenter {
+  id          String  @id @default(uuid())
+  parent_id   String? // Self-reference: null = root, set = child
+  consecutive String  @unique // CCT-0001
+  name        String
+  description String?
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Self-relation (recursive tree)
+  parent   CostCenter?  @relation("CostCenterTree", fields: [parent_id], references: [id], onDelete: Cascade)
+  children CostCenter[] @relation("CostCenterTree")
+
+  // Projections, movements & accounting
+  projections            Projection[]
+  movements              CostCenterMovement[]
+  journal_entry_items    JournalEntryItem[]
+  payment_receipt_lines  PaymentReceiptLine[]
+  prepayments            Prepayment[]
+
+  // External relations
+  crm_opportunities   CrmOpportunity[]          @relation("CrmOpportunityCostCenter")
+  third_parties       ThirdParty[]
+  documents              Document[]             @relation("DocumentCostCenter")
+  document_items         DocumentItem[]
+  document_payments      DocumentPayment[]
+  document_withholdings  DocumentWithholding[]
+  cash_registers         CashRegister[]
+  overtime_records    OvertimeRecord[]           @relation("OvertimeCostCenter")
+  travel_expenses     EmployeeTravelExpense[]    @relation("TravelExpenseCostCenter")
+
+  @@index([parent_id])
+  @@map("cost_centers")
+}
+
+// ============================================
+// COST CENTER MOVEMENT CATALOGS
+// ============================================
+
+model CostCenterMovementType {
+  key    String                    @id // income, cost, expense, tax_iva, withholding_income, etc.
+  name   String                   // Ingreso, Costo, Gasto, IVA, ReteFuente, etc.
+  nature JournalEntryItemType     @default(DEBIT) // DEBIT o CREDIT — naturaleza del tipo para determinar sign del movimiento
+
+  movements             CostCenterMovement[]
+  projection_items      ProjectionItem[]
+  payment_receipt_lines PaymentReceiptLine[]
+  journal_entry_items   JournalEntryItem[]
+
+  @@map("cost_center_movement_types")
+}
+
+model CostCenterMovementReferenceType {
+  key  String @id // invoice, purchase, expense, journal_entry, prepayment, etc.
+  name String // Factura de Venta, Compra, Gasto, Asiento Contable, Anticipo, etc.
+
+  movements CostCenterMovement[]
+
+  @@map("cost_center_movement_reference_types")
+}
+
+// ============================================
+// COST CENTER MOVEMENTS
+// ============================================
+
+enum CostCenterMovementSign {
+  POSITIVE
+  NEGATIVE
+}
+
+model CostCenterMovement {
+  id                 String                 @id @default(uuid())
+  cost_center_id     String
+  movement_date      DateTime               @db.Date
+  type_key           String
+  reference_type_key String
+  sign               CostCenterMovementSign
+  amount             Decimal                @db.Decimal(19, 4)
+  description        String?
+  reference_id       String?
+
+  created_at DateTime @default(now())
+
+  cost_center    CostCenter                       @relation(fields: [cost_center_id], references: [id], onDelete: Cascade)
+  type           CostCenterMovementType           @relation(fields: [type_key], references: [key])
+  reference_type CostCenterMovementReferenceType @relation(fields: [reference_type_key], references: [key])
+  journal_entry_items JournalEntryItem[]
+
+  @@index([cost_center_id])
+  @@index([movement_date])
+  @@index([type_key])
+  @@index([reference_type_key])
+  @@map("cost_center_movements")
+}
+
+// ============================================
+// PROJECTIONS (recursive: parent/children + items by type)
+// ============================================
+
+enum ProjectionScope {
+  GLOBAL      // Company-wide
+  COST_CENTER // Specific cost center
+}
+
+model Projection {
+  id              String          @id @default(uuid())
+  parent_id       String?         // null = root projection, set = sub-period
+  cost_center_id  String?         // null = GLOBAL, set = per cost center
+  scope           ProjectionScope
+  consecutive     String          @unique // PRJ-0001
+  name            String
+  description     String?
+  start_date          DateTime        @db.Date
+  end_date            DateTime        @db.Date
+  include_sub_centers Boolean         @default(false) // only for COST_CENTER scope
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Self-relation (recursive: annual → monthly → weekly → ...)
+  parent   Projection?  @relation("ProjectionTree", fields: [parent_id], references: [id], onDelete: Cascade)
+  children Projection[] @relation("ProjectionTree")
+
+  cost_center CostCenter?      @relation(fields: [cost_center_id], references: [id], onDelete: Cascade)
+  items       ProjectionItem[]
+
+  @@index([parent_id])
+  @@index([cost_center_id])
+  @@index([scope])
+  @@map("projections")
+}
+
+model ProjectionItem {
+  id            String  @id @default(uuid())
+  projection_id String
+  type_key      String  // FK a CostCenterMovementType
+  amount        Decimal @default(0) @db.Decimal(18, 2)
+
+  projection Projection             @relation(fields: [projection_id], references: [id], onDelete: Cascade)
+  type       CostCenterMovementType @relation(fields: [type_key], references: [key])
+
+  @@unique([projection_id, type_key])
+  @@index([projection_id])
+  @@map("projection_items")
+}
+
+// ============================================
+// INVENTORY
+// ============================================
+
+model ProductCategory {
+  id          String  @id @default(uuid())
+  consecutive String  @unique // CAT-0001
+  name        String
+  description String?
+  is_aiu      Boolean @default(false) // Categoría AIU (facturación)
+  is_bag      Boolean @default(false)
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  products Product[]
+
+  @@index([is_active])
+  @@map("product_categories")
+}
+
+model Product {
+  id          String  @id @default(uuid())
+  consecutive String  @unique // ART-0001
+  barcode     String  @unique
+  name        String
+  description String?
+
+  // Categoría
+  category_id String?
+
+  // Precios
+  cost         Decimal     @default(0) @db.Decimal(15, 4)
+  price        Decimal     @db.Decimal(15, 4)
+  tax_included Boolean     @default(false)
+  costing_type CostingType @default(LAST_PURCHASE)
+
+  // Stock
+  stock      Decimal @default(0) @db.Decimal(15, 4)
+  is_service Boolean @default(false)
+
+  // Combinaciones
+  mode              ProductMode @default(PRODUCT)
+  parent_product_id String?
+
+  // FKs a paramétricas
+  tax_id  String?
+  unit_id String? @default("70")
+
+  // Cuentas contables (FK a ChartOfAccount.code)
+  asset_account_code   String? // Cuenta de inventario
+  cogs_account_code    String? // Cuenta costo de ventas
+  revenue_account_code String? // Cuenta de ingresos
+
+  // AIU
+  is_aiu Boolean @default(false)
+  is_bag Boolean @default(false)
+
+  // Imagen
+  image_path String?
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  category        ProductCategory? @relation(fields: [category_id], references: [id])
+  tax             Tax?             @relation(fields: [tax_id], references: [id])
+  unit            ProductUnit?     @relation(fields: [unit_id], references: [id])
+  parent_product  Product?         @relation("ProductCombinations", fields: [parent_product_id], references: [id])
+  combinations    Product[]        @relation("ProductCombinations")
+  asset_account   ChartOfAccount?  @relation("ProductAssetAccount", fields: [asset_account_code], references: [code])
+  cogs_account    ChartOfAccount?  @relation("ProductCogsAccount", fields: [cogs_account_code], references: [code])
+  revenue_account ChartOfAccount?  @relation("ProductRevenueAccount", fields: [revenue_account_code], references: [code])
+
+  // Atributos asignados al producto padre (qué atributos aplican)
+  attribute_assignments ProductAttributeAssignment[]
+
+  // Opciones de atributo asignadas a esta combinación
+  combination_attributes ProductCombinationAttribute[]
+
+  // Stock por bodega
+  storage_stocks StorageStock[]
+
+  // Movimientos
+  movements ProductMovement[]
+
+  // Items de transferencia entre bodegas
+  storage_transfer_items StorageTransferItem[]
+
+  // Items de transferencia entre productos
+  product_transfer_items ProductTransferItem[]
+
+  @@index([category_id])
+  @@index([tax_id])
+  @@index([unit_id])
+  @@index([parent_product_id])
+  @@index([mode])
+  @@index([is_active])
+  @@index([is_service])
+  @@map("products")
+}
+
+// Atributos de producto (Talla, Color, etc.)
+model ProductAttribute {
+  id          String  @id @default(uuid())
+  consecutive String  @unique // ATR-0001
+  name        String
+  description String?
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  options ProductAttributeOption[]
+
+  // Productos que tienen asignado este atributo
+  product_assignments ProductAttributeAssignment[]
+
+  @@index([is_active])
+  @@map("product_attributes")
+}
+
+// Opciones de atributo (S, M, L, Rojo, Azul, etc.)
+model ProductAttributeOption {
+  id                   String @id @default(uuid())
+  product_attribute_id String
+  consecutive          String @unique // OPC-0001
+  name                 String
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  attribute              ProductAttribute             @relation(fields: [product_attribute_id], references: [id])
+  combination_attributes ProductCombinationAttribute[]
+
+  @@index([product_attribute_id])
+  @@index([is_active])
+  @@map("product_attribute_options")
+}
+
+// Junction: Atributos asignados a un producto padre (qué atributos aplican para sus combinaciones)
+model ProductAttributeAssignment {
+  id                   String @id @default(uuid())
+  product_id           String
+  product_attribute_id String
+
+  created_at DateTime @default(now())
+
+  product   Product          @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  attribute ProductAttribute @relation(fields: [product_attribute_id], references: [id])
+
+  @@unique([product_id, product_attribute_id])
+  @@index([product_id])
+  @@index([product_attribute_id])
+  @@map("product_attribute_assignments")
+}
+
+// Junction: Opciones de atributo asignadas a combinaciones de producto
+model ProductCombinationAttribute {
+  id                          String @id @default(uuid())
+  product_id                  String
+  product_attribute_option_id String
+
+  created_at DateTime @default(now())
+
+  product          Product                @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  attribute_option ProductAttributeOption @relation(fields: [product_attribute_option_id], references: [id])
+
+  @@unique([product_id, product_attribute_option_id])
+  @@index([product_id])
+  @@index([product_attribute_option_id])
+  @@map("product_combination_attributes")
+}
+
+// ============================================
+// WAREHOUSES & STORAGES
+// ============================================
+
+model Warehouse {
+  id           String  @id @default(uuid())
+  consecutive  String  @unique // ALM-0001
+  name         String
+  is_principal Boolean @default(false)
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  storages Storage[]
+  users    WarehouseUser[]
+
+  @@index([is_active])
+  @@map("warehouses")
+}
+
+model Storage {
+  id           String  @id @default(uuid())
+  warehouse_id String
+  consecutive  String  @unique // BOD-0001
+  name         String
+  is_principal Boolean @default(false)
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  warehouse Warehouse @relation(fields: [warehouse_id], references: [id])
+
+  // Stock
+  storage_stocks StorageStock[]
+
+  // Movimientos
+  movements ProductMovement[]
+
+  // Transferencias entre bodegas (bodega por línea)
+  storage_transfer_items StorageTransferItem[]
+
+  // Transferencias entre productos (bodega por línea)
+  product_transfer_items ProductTransferItem[]
+
+  // Documentos
+  document_items      DocumentItem[]
+  document_receptions DocumentReception[]
+
+  // POS
+  cash_registers CashRegister[]
+
+  @@index([warehouse_id])
+  @@index([is_active])
+  @@map("storages")
+}
+
+// Junction: Usuarios asignados a almacenes
+model WarehouseUser {
+  id             String @id @default(uuid())
+  warehouse_id   String
+  tenant_user_id String
+
+  created_at DateTime @default(now())
+
+  warehouse   Warehouse  @relation(fields: [warehouse_id], references: [id], onDelete: Cascade)
+  tenant_user TenantUser @relation(fields: [tenant_user_id], references: [id], onDelete: Cascade)
+
+  @@unique([warehouse_id, tenant_user_id])
+  @@index([warehouse_id])
+  @@index([tenant_user_id])
+  @@map("warehouse_users")
+}
+
+// Stock por bodega
+model StorageStock {
+  id         String  @id @default(uuid())
+  product_id String
+  storage_id String
+  stock      Decimal @db.Decimal(15, 4)
+
+  updated_at DateTime @updatedAt
+
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  storage Storage @relation(fields: [storage_id], references: [id], onDelete: Cascade)
+
+  @@unique([product_id, storage_id])
+  @@index([product_id])
+  @@index([storage_id])
+  @@map("storage_stocks")
+}
+
+// ============================================
+// PRODUCT MOVEMENTS
+// ============================================
+
+model ProductMovement {
+  id          String                   @id @default(uuid())
+  consecutive String                   @unique // IM-0001
+  product_id  String
+  storage_id  String?
+  type_key    String
+  direction   ProductMovementDirection
+  quantity    Decimal                  @db.Decimal(15, 4)
+  date        DateTime                 @db.Date
+
+  // Referencia al documento origen
+  reference_id          String?
+  reference_consecutive String?
+
+  notes      String?
+  created_at DateTime @default(now())
+
+  product Product              @relation(fields: [product_id], references: [id])
+  storage Storage?             @relation(fields: [storage_id], references: [id])
+  type    ProductMovementType  @relation(fields: [type_key], references: [key])
+
+  @@index([product_id])
+  @@index([storage_id])
+  @@index([type_key])
+  @@index([date])
+  @@index([direction])
+  @@map("product_movements")
+}
+
+// ============================================
+// STORAGE TRANSFERS
+// ============================================
+
+model StorageTransfer {
+  id          String                @id @default(uuid())
+  consecutive String                @unique // TI-0001
+  reason      String?
+  date        DateTime              @default(now()) @db.Date
+  status      StorageTransferStatus @default(PENDING)
+
+  // Trazabilidad
+  transferred_by   String
+  approved_by      String?
+  approved_at      DateTime?
+  rejected_by      String?
+  rejected_at      DateTime?
+  rejection_reason String?
+
+  created_at DateTime @default(now())
+
+  transferred_by_user TenantUser  @relation("TransferRequestedBy", fields: [transferred_by], references: [id])
+  approved_by_user    TenantUser? @relation("TransferApprovedBy", fields: [approved_by], references: [id])
+  rejected_by_user    TenantUser? @relation("TransferRejectedBy", fields: [rejected_by], references: [id])
+
+  items StorageTransferItem[]
+
+  @@index([status])
+  @@index([transferred_by])
+  @@index([created_at])
+  @@map("storage_transfers")
+}
+
+model StorageTransferItem {
+  id          String                   @id @default(uuid())
+  transfer_id String
+  product_id  String
+  storage_id  String
+  direction   ProductMovementDirection
+  quantity    Decimal                  @db.Decimal(15, 4)
+
+  created_at DateTime @default(now())
+
+  transfer StorageTransfer @relation(fields: [transfer_id], references: [id], onDelete: Cascade)
+  product  Product         @relation(fields: [product_id], references: [id])
+  storage  Storage         @relation(fields: [storage_id], references: [id])
+
+  @@index([transfer_id])
+  @@index([product_id])
+  @@index([storage_id])
+  @@map("storage_transfer_items")
+}
+
+// Transferencia entre productos (padre ↔ combinaciones)
+model ProductTransfer {
+  id          String                 @id @default(uuid())
+  consecutive String                 @unique // TP-0001
+  reason      String
+  date        DateTime               @default(now()) @db.Date
+  status      ProductTransferStatus  @default(PENDING)
+
+  // Trazabilidad
+  requested_by     String
+  approved_by      String?
+  approved_at      DateTime?
+  rejected_by      String?
+  rejected_at      DateTime?
+  rejection_reason String?
+
+  created_at DateTime @default(now())
+
+  requested_by_user TenantUser  @relation("ProductTransferRequestedBy", fields: [requested_by], references: [id])
+  approved_by_user  TenantUser? @relation("ProductTransferApprovedBy", fields: [approved_by], references: [id])
+  rejected_by_user  TenantUser? @relation("ProductTransferRejectedBy", fields: [rejected_by], references: [id])
+
+  items ProductTransferItem[]
+
+  @@index([status])
+  @@index([requested_by])
+  @@index([created_at])
+  @@map("product_transfers")
+}
+
+// Líneas de transferencia entre productos (cada línea = un producto + dirección + bodega opcional)
+model ProductTransferItem {
+  id          String                   @id @default(uuid())
+  transfer_id String
+  product_id  String
+  storage_id  String?
+  direction   ProductMovementDirection // IN = entrada, OUT = salida
+  quantity    Decimal                  @db.Decimal(15, 4)
+
+  created_at DateTime @default(now())
+
+  transfer ProductTransfer @relation(fields: [transfer_id], references: [id], onDelete: Cascade)
+  product  Product         @relation(fields: [product_id], references: [id])
+  storage  Storage?        @relation(fields: [storage_id], references: [id])
+
+  @@index([transfer_id])
+  @@index([product_id])
+  @@index([storage_id])
+  @@map("product_transfer_items")
+}
+
+// ============================================
+// ACCOUNTING
+// ============================================
+
+model ChartOfAccount {
+  code        String      @id
+  name        String
+  type        AccountType
+  parent_code String?
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  parent   ChartOfAccount?  @relation("AccountHierarchy", fields: [parent_code], references: [code])
+  children ChartOfAccount[] @relation("AccountHierarchy")
+
+  third_parties_cxc ThirdParty[] @relation("ThirdPartyCxcAccount")
+  third_parties_cxp ThirdParty[] @relation("ThirdPartyCxpAccount")
+
+  accounting_configs AccountingConfig[] @relation("AccountConfig")
+
+  // Payroll concepts
+  payroll_concepts_debit       PayrollConcept[] @relation("PayrollConceptDebit")
+  payroll_concepts_admin_debit PayrollConcept[] @relation("PayrollConceptAdminDebit")
+  payroll_concepts_credit      PayrollConcept[] @relation("PayrollConceptCredit")
+
+  // Journal entries, payments, prepayments
+  journal_entry_items              JournalEntryItem[]
+  payment_receipt_lines            PaymentReceiptLine[]
+  prepayments                      Prepayment[]           @relation("PrepaymentAccount")
+  prepayments_counterpart          Prepayment[]           @relation("PrepaymentCounterpartAccount")
+  ar_ap                            ArAp[]
+
+  // Fixed assets
+  fixed_assets_asset        FixedAsset[] @relation("FixedAssetAccount")
+  fixed_assets_depreciation FixedAsset[] @relation("FixedAssetDepreciationAccount")
+  fixed_assets_expense      FixedAsset[] @relation("FixedAssetExpenseAccount")
+
+  // Bank reconciliation
+  bank_adjustment_types BankAdjustmentType[]
+
+  // Expense categories
+  expense_categories ExpenseCategory[]
+
+  // Products
+  products_asset   Product[] @relation("ProductAssetAccount")
+  products_cogs    Product[] @relation("ProductCogsAccount")
+  products_revenue Product[] @relation("ProductRevenueAccount")
+
+  // Tax accounts
+  taxes_sales_account             Tax[] @relation("TaxSalesAccount")
+  taxes_purchases_account         Tax[] @relation("TaxPurchasesAccount")
+  taxes_cost_account              Tax[] @relation("TaxCostAccount")
+  taxes_withholding_sales         Tax[] @relation("WithholdingSalesAccount")
+  taxes_withholding_purchases     Tax[] @relation("WithholdingPurchasesAccount")
+
+  @@index([type])
+  @@index([parent_code])
+  @@map("chart_of_accounts")
+}
+
+model AccountingConfig {
+  key          String   @id
+  description  String
+  account_code String?
+  default      String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  account ChartOfAccount? @relation("AccountConfig", fields: [account_code], references: [code])
+
+  @@map("accounting_configs")
+}
+
+model PayrollConcept {
+  key                               String             @id
+  name                              String
+  debit_account_code                String?
+  administrative_debit_account_code String?
+  credit_account_code               String?
+  default_value                     Decimal?           @db.Decimal(18, 4)
+  default_percentage                Decimal?           @db.Decimal(18, 4)
+  is_percentage                     Boolean            @default(false)
+  is_array                          Boolean            @default(false)
+  is_legal                          Boolean            @default(false)
+  concept_type                      PayrollConceptType @default(ACCRUED)
+  created_at                        DateTime           @default(now())
+  updated_at                        DateTime           @updatedAt
+
+  debit_account                ChartOfAccount? @relation("PayrollConceptDebit", fields: [debit_account_code], references: [code])
+  administrative_debit_account ChartOfAccount? @relation("PayrollConceptAdminDebit", fields: [administrative_debit_account_code], references: [code])
+  credit_account               ChartOfAccount? @relation("PayrollConceptCredit", fields: [credit_account_code], references: [code])
+
+  @@map("payroll_concepts")
+}
+
+model JournalEntryType {
+  key         String @id
+  description String
+  color       String @default("#6B7280")
+
+  journal_entries JournalEntry[]
+
+  @@map("journal_entry_types")
+}
+
+model JournalEntry {
+  id           String    @id @default(uuid())
+  consecutive  String?
+  date         DateTime? @db.Date // nullable para asientos de cierre
+  description  String?
+  type_key     String
+  reference_id String?
+  is_reversed  Boolean  @default(false)
+  created_at   DateTime @default(now())
+
+  // -- Recurrente --
+  is_recurrent        Boolean @default(false)
+  recurrent_name      String?
+  recurrent_period    String? // 1 month, 1 week, etc.
+  recurrent_is_active Boolean @default(false)
+
+  type                      JournalEntryType         @relation(fields: [type_key], references: [key])
+  items                     JournalEntryItem[]
+  accounting_period_actions AccountingPeriodAction[]
+  fixed_asset_movements     FixedAssetMovement[]
+  payment_receipts          PaymentReceipt[]
+  payments                  Payment[]
+
+  @@index([type_key])
+  @@index([date])
+  @@map("journal_entries")
+}
+
+model JournalEntryItem {
+  id               String                    @id @default(uuid())
+  journal_entry_id String
+  account_code     String
+  type             JournalEntryItemType
+  amount           Decimal                   @db.Decimal(19, 4)
+  description      String?
+  third_party_id   String?
+  bank_account_id  String?
+  cost_center_id          String?
+  cost_center_movement_id       String?
+  cost_center_movement_type_key String?
+  reference_type          JournalEntryItemRefType   @default(NORMAL)
+  reference_id            String?
+
+  journal_entry             JournalEntry             @relation(fields: [journal_entry_id], references: [id], onDelete: Cascade)
+  account                   ChartOfAccount           @relation(fields: [account_code], references: [code])
+  third_party               ThirdParty?              @relation(fields: [third_party_id], references: [id])
+  bank_account              BankAccount?             @relation(fields: [bank_account_id], references: [id])
+  cost_center               CostCenter?              @relation(fields: [cost_center_id], references: [id])
+  cost_center_movement      CostCenterMovement?      @relation(fields: [cost_center_movement_id], references: [id])
+  cost_center_movement_type CostCenterMovementType?  @relation(fields: [cost_center_movement_type_key], references: [key])
+  bank_reconciliation_items BankReconciliationItem[]
+  payment_receipt_lines     PaymentReceiptLine[]
+  payments                  Payment[]
+
+  @@index([journal_entry_id])
+  @@index([account_code])
+  @@index([cost_center_id])
+  @@index([cost_center_movement_id])
+  @@index([reference_type])
+  @@index([reference_id])
+  @@map("journal_entry_items")
+}
+
+// ============================================
+// ACCOUNTING PERIODS (Periodos Contables)
+// ============================================
+
+model AccountingPeriod {
+  id          String @id @default(uuid())
+  consecutive String @unique // PC-0001
+  name        String // "Enero 2025", "Año 2025"
+
+  start_date DateTime @db.Date
+  end_date   DateTime @db.Date
+  year       Int
+
+  is_annual        Boolean                @default(false) // TRUE = cierra cuentas 4/5/6
+  parent_period_id String? // Período anual padre (para mensuales)
+  status           AccountingPeriodStatus @default(OPEN)
+
+  closed_at   DateTime?
+  closed_by   String?
+  reopened_at DateTime?
+  reopened_by String?
+
+  description String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  parent_period    AccountingPeriod?  @relation("PeriodParent", fields: [parent_period_id], references: [id])
+  child_periods    AccountingPeriod[] @relation("PeriodParent")
+  closed_by_user   TenantUser?        @relation("PeriodClosedBy", fields: [closed_by], references: [id])
+  reopened_by_user TenantUser?        @relation("PeriodReopenedBy", fields: [reopened_by], references: [id])
+
+  actions AccountingPeriodAction[]
+
+  @@index([year])
+  @@index([status])
+  @@index([is_annual])
+  @@index([parent_period_id])
+  @@map("accounting_periods")
+}
+
+model AccountingPeriodAction {
+  id        String                     @id @default(uuid())
+  period_id String
+  action    AccountingPeriodActionType
+
+  reason           String?
+  journal_entry_id String?
+  created_by       String?
+  is_manual        Boolean @default(false)
+
+  created_at DateTime @default(now())
+
+  // Relations
+  period          AccountingPeriod @relation(fields: [period_id], references: [id], onDelete: Cascade)
+  journal_entry   JournalEntry?    @relation(fields: [journal_entry_id], references: [id])
+  created_by_user TenantUser?      @relation("PeriodActionCreatedBy", fields: [created_by], references: [id])
+
+  @@index([period_id])
+  @@index([action])
+  @@map("accounting_period_actions")
+}
+
+model ArApSource {
+  key         String @id
+  description String
+
+  ar_ap_records         ArAp[]
+  payment_receipt_lines PaymentReceiptLine[]
+  prepayment_movements  PrepaymentMovement[]
+
+  @@map("ar_ap_sources")
+}
+
+model BankAccount {
+  id             String          @id @default(uuid())
+  bank_id        String?
+  account_number String?
+  account_type   BankAccountType
+  account_name   String
+  account_id     String? // FK a ChartOfAccount
+
+  initial_balance Decimal @default(0) @db.Decimal(15, 4)
+  current_balance Decimal @default(0) @db.Decimal(15, 4)
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  bank                   Bank?                 @relation(fields: [bank_id], references: [id])
+  journal_entry_items    JournalEntryItem[]
+  reconciliations        BankReconciliation[]
+  cash_registers         CashRegister[]        @relation("CashRegisterCashAccount")
+  document_payments DocumentPayment[]
+  bank_movements    BankMovement[]
+  prepayments            Prepayment[]
+
+  @@index([bank_id])
+  @@map("bank_accounts")
+}
+
+// ============================================
+// BANK MOVEMENT TYPES (Tipos de Movimientos Bancarios)
+// ============================================
+
+model BankMovementType {
+  key         String @id
+  description String
+
+  movements BankMovement[]
+
+  @@map("bank_movement_types")
+}
+
+model BankMovement {
+  id                    String                @id @default(uuid())
+  bank_account_id       String
+  consecutive           String                // MB-0001
+  transaction_date      DateTime              @db.Date
+  amount                Decimal               @db.Decimal(19, 4)
+  direction             BankMovementDirection @default(INCOME)
+  type_key              String
+  description           String?
+  reference_id          String?  // UUID del documento origen (JournalEntry, Payment, etc.)
+  reference_type        String?  // Tipo del documento: 'journal_entry', 'payment', etc.
+  reference_consecutive String   @default("Movimiento desconocido")
+  created_at            DateTime @default(now())
+
+  bank_account BankAccount      @relation(fields: [bank_account_id], references: [id], onDelete: Cascade)
+  type         BankMovementType @relation(fields: [type_key], references: [key])
+
+  @@index([bank_account_id])
+  @@index([transaction_date])
+  @@index([type_key])
+  @@map("bank_movements")
+}
+
+// ============================================
+// AR/AP (Cuentas por Cobrar / Pagar)
+// ============================================
+
+model ArAp {
+  id               String     @id @default(uuid())
+  third_party_id   String
+  type             ArApType
+  source_key       String
+  source_id        String
+  source_number    String?
+  consecutive      String? // CXC-0001 / CXP-0001
+  date             DateTime   @db.Date
+  due_date         DateTime?  @db.Date
+  amount           Decimal    @db.Decimal(19, 4)
+  paid             Decimal    @default(0) @db.Decimal(19, 4)
+  balance          Decimal    @db.Decimal(19, 4)
+  status           ArApStatus @default(PENDING)
+  description      String?
+  account_code     String?
+  journal_entry_id String?
+  created_at       DateTime   @default(now())
+  updated_at       DateTime   @updatedAt
+
+  third_party ThirdParty      @relation(fields: [third_party_id], references: [id])
+  source      ArApSource      @relation(fields: [source_key], references: [key])
+  account     ChartOfAccount? @relation(fields: [account_code], references: [code])
+  payments    Payment[]
+
+  @@index([third_party_id])
+  @@index([source_key])
+  @@index([account_code])
+  @@index([type])
+  @@index([status])
+  @@index([date])
+  @@map("ar_ap")
+}
+
+// ============================================
+// PAYMENT RECEIPTS (Recibos de Caja / Comprobantes de Egreso)
+// ============================================
+
+model PaymentReceipt {
+  id               String               @id @default(uuid())
+  type             PaymentReceiptType
+  consecutive      String? // RC-0001 / CE-0001
+  date             DateTime             @db.Date
+  amount           Decimal              @db.Decimal(19, 4)
+  third_party_id   String?
+  journal_entry_id String?
+  status           PaymentReceiptStatus @default(ACTIVE)
+  description      String?
+  created_at       DateTime             @default(now())
+  updated_at       DateTime             @updatedAt
+
+  third_party   ThirdParty?          @relation(fields: [third_party_id], references: [id])
+  journal_entry JournalEntry?        @relation(fields: [journal_entry_id], references: [id])
+  lines         PaymentReceiptLine[]
+  payments      Payment[]
+
+  @@index([type])
+  @@index([third_party_id])
+  @@index([journal_entry_id])
+  @@index([date])
+  @@index([status])
+  @@map("payment_receipts")
+}
+
+model PaymentReceiptLine {
+  id                        String                 @id @default(uuid())
+  payment_receipt_id        String
+  kind                      PaymentReceiptLineKind
+  account_code              String
+  debit                     Decimal                @default(0) @db.Decimal(19, 4)
+  credit                    Decimal                @default(0) @db.Decimal(19, 4)
+  ref_id                    String?
+  journal_entry_item_id     String?
+  applied_to_source_key     String?
+  applied_to_id             String?
+  company_payment_method_id String?
+  description               String?
+  cost_center_id                String?
+  cost_center_movement_type_key String?
+  created_at                DateTime               @default(now())
+
+  payment_receipt            PaymentReceipt            @relation(fields: [payment_receipt_id], references: [id], onDelete: Cascade)
+  account                    ChartOfAccount            @relation(fields: [account_code], references: [code])
+  journal_entry_item         JournalEntryItem?         @relation(fields: [journal_entry_item_id], references: [id])
+  applied_source             ArApSource?               @relation(fields: [applied_to_source_key], references: [key])
+  company_payment_method     CompanyPaymentMethod?     @relation(fields: [company_payment_method_id], references: [id])
+  cost_center                CostCenter?               @relation(fields: [cost_center_id], references: [id])
+  cost_center_movement_type  CostCenterMovementType?   @relation(fields: [cost_center_movement_type_key], references: [key])
+  payments                   Payment[]
+
+  @@index([payment_receipt_id])
+  @@index([kind])
+  @@index([account_code])
+  @@index([journal_entry_item_id])
+  @@index([company_payment_method_id])
+  @@index([cost_center_id])
+  @@map("payment_receipt_lines")
+}
+
+// ============================================
+// PAYMENTS (Pagos individuales)
+// ============================================
+
+model Payment {
+  id                      String   @id @default(uuid())
+  ar_ap_id                String
+  consecutive             String? // RP-0001 / PP-0001
+  date                    DateTime @db.Date
+  amount                  Decimal  @db.Decimal(19, 4)
+  description             String?
+  is_voided               Boolean  @default(false)
+  journal_entry_id        String?
+  journal_entry_item_id   String?
+  payment_receipt_id      String?
+  payment_receipt_line_id String?
+  created_at              DateTime @default(now())
+  updated_at              DateTime @updatedAt
+
+  ar_ap                ArAp                @relation(fields: [ar_ap_id], references: [id])
+  payment_receipt      PaymentReceipt?     @relation(fields: [payment_receipt_id], references: [id])
+  payment_receipt_line PaymentReceiptLine? @relation(fields: [payment_receipt_line_id], references: [id])
+  journal_entry        JournalEntry?       @relation(fields: [journal_entry_id], references: [id])
+  journal_entry_item   JournalEntryItem?   @relation(fields: [journal_entry_item_id], references: [id])
+
+  @@index([ar_ap_id])
+  @@index([payment_receipt_id])
+  @@index([payment_receipt_line_id])
+  @@index([journal_entry_id])
+  @@index([journal_entry_item_id])
+  @@index([date])
+  @@map("payments")
+}
+
+// ============================================
+// PREPAYMENTS (Anticipos)
+// ============================================
+
+model Prepayment {
+  id                        String           @id @default(uuid())
+  third_party_id            String
+  prepayment_type           PrepaymentType
+  consecutive               String? // AT-0001
+  prepayment_date           DateTime         @db.Date
+  original_amount           Decimal          @db.Decimal(19, 4)
+  balance                   Decimal          @db.Decimal(19, 4)
+  account_code              String?
+  counterpart_account_code  String?
+  bank_account_id           String?
+  company_payment_method_id String?
+  journal_entry_id          String?
+  cost_center_id            String?
+  status                    PrepaymentStatus @default(ACTIVE)
+  notes                     String?
+  voided_at                 DateTime?
+  voided_reason             String?
+  voided_by                 String?
+  refunded_at               DateTime?
+  refunded_reason           String?
+  refunded_by               String?
+  created_at                DateTime         @default(now())
+  updated_at                DateTime         @updatedAt
+
+  third_party            ThirdParty            @relation(fields: [third_party_id], references: [id])
+  account                ChartOfAccount?       @relation("PrepaymentAccount", fields: [account_code], references: [code])
+  counterpart_account    ChartOfAccount?       @relation("PrepaymentCounterpartAccount", fields: [counterpart_account_code], references: [code])
+  bank_account           BankAccount?          @relation(fields: [bank_account_id], references: [id])
+  company_payment_method CompanyPaymentMethod? @relation(fields: [company_payment_method_id], references: [id])
+  cost_center            CostCenter?           @relation(fields: [cost_center_id], references: [id])
+  movements              PrepaymentMovement[]
+  document_payments      DocumentPayment[]
+
+  @@index([third_party_id])
+  @@index([prepayment_type])
+  @@index([status])
+  @@index([prepayment_date])
+  @@index([bank_account_id])
+  @@index([company_payment_method_id])
+  @@index([counterpart_account_code])
+  @@index([cost_center_id])
+  @@map("prepayments")
+}
+
+model PrepaymentMovement {
+  id                    String   @id @default(uuid())
+  prepayment_id         String
+  consecutive           String? // ATM-0001
+  application_date      DateTime @db.Date
+  amount                Decimal  @db.Decimal(19, 4)
+  applied_to_source_key String?
+  applied_to_id         String?
+  applied_to_number     String?
+  journal_entry_id      String?
+  is_voided             Boolean  @default(false)
+  notes                 String?
+  created_at            DateTime @default(now())
+
+  prepayment     Prepayment  @relation(fields: [prepayment_id], references: [id])
+  applied_source ArApSource? @relation(fields: [applied_to_source_key], references: [key])
+
+  @@index([prepayment_id])
+  @@index([applied_to_source_key])
+  @@index([application_date])
+  @@map("prepayment_movements")
+}
+
+// ============================================
+// AUDIT LOG
+// ============================================
+
+model AuditLog {
+  id         String  @id @default(uuid())
+  user_id    String?
+  email      String?
+  session_id String?
+  company_id String?
+
+  action_key         String
+  action_description String?
+  entity_type        String?
+  entity_id          String?
+
+  service_name  String?
+  method        String?
+  url           String?
+  status_code   Int?
+  duration_ms   Int?
+  error_message String?
+
+  request_body  Json?
+  response_body Json?
+  old_values    Json?
+  new_values    Json?
+
+  ip_address String?
+  user_agent String?
+
+  performed_at DateTime @default(now())
+
+  @@index([user_id])
+  @@index([entity_type, entity_id])
+  @@index([performed_at])
+  @@index([action_key])
+  @@index([service_name])
+  @@map("audit_log")
+}
+
+// ============================================
+// COMPANY CONFIGURATIONS
+// ============================================
+
+// ============================================
+// COMPANY SETTINGS (Clave-Valor)
+// Reemplaza PayrollConfig con estructura flexible
+// ============================================
+
+model CompanySetting {
+  id          String  @id @default(uuid())
+  category    String // 'legal_params', 'social_security', 'overtime', 'work_schedule', 'work_hours', 'transportation', 'payroll_numbering'
+  key         String // 'smlv', 'transportation_allowance', 'work_hours_per_day', etc.
+  value       String // Valor como string (se parsea segun value_type)
+  value_type  String // 'number', 'decimal', 'boolean', 'string', 'time', 'json'
+  description String? // Descripcion legible
+  is_readonly Boolean @default(false) // Para valores legales que no deberian cambiar
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([category, key])
+  @@index([category])
+  @@map("company_settings")
+}
+
+model PilaConfig {
+  id String @id @default(uuid())
+
+  username        String?
+  password        String?
+  secret_key      String?
+  contributor_id  Int?
+  decree_768_code String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("pila_config")
+}
+
+model EmailSmsConfig {
+  id String @id @default(uuid())
+
+  smtp_host     String?
+  smtp_port     Int     @default(587)
+  smtp_user     String?
+  smtp_password String?
+  from_name     String?
+
+  twilio_account_sid     String?
+  twilio_auth_token      String?
+  twilio_whatsapp_number String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("email_sms_config")
+}
+
+model PaymentGatewayConfig {
+  id String @id @default(uuid())
+
+  bold_api_key    String?
+  bold_secret_key String?
+  bold_test_mode  Boolean @default(true)
+
+  epayco_token     String?
+  epayco_cust_id   String?
+  epayco_p_key     String?
+  epayco_test_mode Boolean @default(true)
+
+  wompi_public_key    String?
+  wompi_private_key   String?
+  wompi_integrity_key String?
+  wompi_events_key    String?
+  wompi_test_mode     Boolean @default(true)
+
+  payment_otp_enabled        Boolean @default(false)
+  payment_otp_expiry_minutes Int     @default(10)
+  billing_otp_enabled        Boolean @default(false)
+  billing_otp_expiry_minutes Int     @default(10)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("payment_gateway_config")
+}
+
+model IntegrationsConfig {
+  id String @id @default(uuid())
+
+  cal_api_key             String?
+  default_commission_rate Decimal @default(0) @db.Decimal(8, 4)
+  ecommerce_api_token     String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("integrations_config")
+}
+
+// ============================================
+// EXPENSE CATEGORIES
+// ============================================
+
+model ExpenseCategory {
+  id                   String  @id @default(uuid())
+  name                 String  @unique
+  description          String?
+  expense_account_code String?
+  is_service           Boolean @default(false)
+
+  created_at DateTime @default(now())
+
+  expense_account ChartOfAccount? @relation(fields: [expense_account_code], references: [code])
+  documents       Document[]
+
+  @@map("expense_categories")
+}
+
+// ============================================
+// DISCREPANCY RESPONSES (NC/ND) - Parametric
+// ============================================
+
+model CreditNoteDiscrepancyResponse {
+  id   BigInt @id @default(autoincrement())
+  code String @db.VarChar(191)
+  name String @db.VarChar(191)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  documents Document[]
+
+  @@map("credit_note_discrepancy_responses")
+}
+
+model CreditNoteDiscrepancyResponseSd {
+  id   BigInt @id @default(autoincrement())
+  code String @db.VarChar(191)
+  name String @db.VarChar(191)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  documents Document[]
+
+  @@map("credit_note_discrepancy_responses_sd")
+}
+
+model DebitNoteDiscrepancyResponse {
+  id   BigInt @id @default(autoincrement())
+  code String @db.VarChar(191)
+  name String @db.VarChar(191)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  documents Document[]
+
+  @@map("debit_note_discrepancy_responses")
+}
+
+// ============================================
+// DOCUMENTS (Unified: Invoices, Purchases, Expenses, Quotes, PO)
+// ============================================
+
+model Document {
+  id String @id @default(uuid())
+
+  // -- Tipo --
+  doc_type DocType
+
+  // -- Tercero --
+  third_party_id   String?
+  third_party_name String? // cache
+
+  // -- Consecutivos --
+  consecutive     String?
+  external_number String? // número proveedor (compras/gastos)
+
+  // -- Fechas --
+  doc_date   DateTime  @db.Date
+  due_date   DateTime? @db.Date
+  issue_time DateTime? @db.Time(6)
+
+  // -- Montos --
+  subtotal            Decimal @default(0) @db.Decimal(19, 4)
+  total_discounts     Decimal @default(0) @db.Decimal(19, 4)
+  total_taxes         Decimal @default(0) @db.Decimal(19, 4)
+  total_withholdings  Decimal @default(0) @db.Decimal(19, 4)
+  net_amount          Decimal @default(0) @db.Decimal(19, 4) // subtotal + taxes - withholdings
+  tax_details         Json? // resumen impuestos
+  withholding_details Json? // resumen retenciones
+
+  // -- Estado --
+  status DocumentStatus @default(DRAFT)
+
+  // -- Pago --
+  payment_type      PaymentType?
+  payment_method_id String? // FK a CompanyPaymentMethod (requerido por DIAN en crédito)
+
+  // -- DIAN (Factura Electrónica) --
+  type_operation_id String?
+  resolution_id     String?
+  cufe          String? // Código Único FE
+  cude          String? // Código Único Doc Soporte
+  qr_code_data  String?   @db.Text
+  number_in_api String? // consecutivo API DIAN
+  api_prefix    String?
+  sent_to_api   SentToApi @default(NOT_SENT)
+  api_response  Json?
+
+  // -- Referencias NC/ND --
+  referenced_doc_id             String?
+  credit_note_discrepancy_id    BigInt?
+  credit_note_discrepancy_sd_id BigInt?
+  debit_note_discrepancy_id     BigInt?
+
+  // -- Específicos Invoice --
+  purchase_order_consecutive String?
+  purchase_order_date        DateTime? @db.Date
+
+  // -- Específicos Expense --
+  category_id    String?
+  deductible     Boolean @default(false)
+  dian_cufe      String? // CUFE importado
+  importado_dian Boolean @default(false)
+
+  // -- Específicos Quote --
+  valid_from          DateTime? @db.Date
+  valid_to            DateTime? @db.Date
+  accepted            Boolean?
+  decision_token      String?
+  decision_expires_at DateTime?
+  decided_at          DateTime?
+  accepted_invoice_id String?
+  opportunity_id      String?
+  crm_third_party_id  String?
+
+  // -- Específicos Purchase Order --
+  expected_delivery_date DateTime?  @db.Date
+  order_type             OrderType?
+  generated_doc_id       String?
+  approved_by            String?
+  approved_at            DateTime?
+  cancelled_by           String?
+  cancelled_at           DateTime?
+  cancellation_reason    String?    @db.Text
+
+  // -- Recurrente (solo para tipos *_RECURRENT) --
+  recurrent_name      String?
+  recurrent_period    String? // 1 month, 1 week, etc. (stored as string, interval not in Prisma)
+  recurrent_is_active Boolean @default(false)
+
+  // -- Otros --
+  cost_center_id String? // FK a CostCenter (para CxC)
+  notes          String? @db.Text
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  payment_method             CompanyPaymentMethod?            @relation("DocumentPaymentMethod", fields: [payment_method_id], references: [id])
+  cost_center                CostCenter?                      @relation("DocumentCostCenter", fields: [cost_center_id], references: [id])
+  type_operation             TypeOperation?                   @relation(fields: [type_operation_id], references: [id])
+  resolution                 Resolution?                      @relation(fields: [resolution_id], references: [id])
+  category                   ExpenseCategory?                 @relation(fields: [category_id], references: [id])
+  credit_note_discrepancy    CreditNoteDiscrepancyResponse?   @relation(fields: [credit_note_discrepancy_id], references: [id])
+  credit_note_discrepancy_sd CreditNoteDiscrepancyResponseSd? @relation(fields: [credit_note_discrepancy_sd_id], references: [id])
+  debit_note_discrepancy     DebitNoteDiscrepancyResponse?    @relation(fields: [debit_note_discrepancy_id], references: [id])
+
+  // Self-relations
+  referenced_doc   Document?  @relation("DocumentReference", fields: [referenced_doc_id], references: [id])
+  referencing_docs Document[] @relation("DocumentReference")
+  accepted_invoice Document?  @relation("QuoteToInvoice", fields: [accepted_invoice_id], references: [id])
+  quotes           Document[] @relation("QuoteToInvoice")
+  generated_doc    Document?  @relation("POToDoc", fields: [generated_doc_id], references: [id])
+  purchase_orders  Document[] @relation("POToDoc")
+
+  // CRM relations
+  crm_opportunity CrmOpportunity? @relation("OpportunityDocuments", fields: [opportunity_id], references: [id])
+  crm_third_party ThirdParty?     @relation("ContactDocuments", fields: [crm_third_party_id], references: [id])
+
+  // Child tables
+  items        DocumentItem[]
+  withholdings DocumentWithholding[]
+  attachments  DocumentAttachment[]
+  aiu          DocumentAiu?
+  receptions   DocumentReception[]
+
+  // POS
+  cash_movements CashMovement[]
+
+  // Pagos del documento
+  payments DocumentPayment[]
+
+  @@index([doc_type])
+  @@index([third_party_id])
+  @@index([status])
+  @@index([doc_date])
+  @@index([category_id])
+  @@index([referenced_doc_id])
+  @@index([payment_method_id])
+  @@index([cost_center_id])
+  @@index([opportunity_id])
+  @@index([crm_third_party_id])
+  @@map("documents")
+}
+
+// ============================================
+// DOCUMENT BANK PAYMENTS (Pagos Bancarios)
+// ============================================
+
+model DocumentPayment {
+  id                        String  @id @default(uuid())
+  document_id               String
+  company_payment_method_id String
+  bank_account_id           String?
+  prepayment_id             String?
+  cost_center_id            String?
+  amount                    Decimal @db.Decimal(19, 4)
+
+  created_at DateTime @default(now())
+
+  document               Document             @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  company_payment_method CompanyPaymentMethod @relation(fields: [company_payment_method_id], references: [id])
+  bank_account           BankAccount?         @relation(fields: [bank_account_id], references: [id])
+  prepayment             Prepayment?          @relation(fields: [prepayment_id], references: [id])
+  cost_center            CostCenter?          @relation(fields: [cost_center_id], references: [id])
+
+  @@index([document_id])
+  @@index([company_payment_method_id])
+  @@index([bank_account_id])
+  @@index([prepayment_id])
+  @@index([cost_center_id])
+  @@map("document_payments")
+}
+
+// ============================================
+// DOCUMENT ITEMS (Líneas de Documentos)
+// ============================================
+
+model DocumentItem {
+  id          String  @id @default(uuid())
+  document_id String
+  product_id  String?
+  description String? @db.Text
+
+  quantity          Decimal @db.Decimal(19, 4)
+  quantity_received Decimal @default(0) @db.Decimal(19, 4) // solo PO
+  unit_price        Decimal @db.Decimal(19, 4) // precio venta
+  cost_price        Decimal @default(0) @db.Decimal(19, 4) // costo (compras)
+  total_price       Decimal @db.Decimal(19, 4)
+
+  is_discount_rate     Boolean @default(false)
+  discount_rate        Decimal @default(0) @db.Decimal(5, 2)
+  discount_value       Decimal @default(0) @db.Decimal(19, 4)
+  discount_rate_value  Decimal @default(0) @db.Decimal(19, 4)
+  discount_total_value Decimal @default(0) @db.Decimal(19, 4)
+
+  tax_details Json?
+
+  original_item_id String?
+  storage_id       String?
+  cost_center_id   String?
+  fixed_asset_id   String?
+
+  document       Document       @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  original_item  DocumentItem?  @relation("CreditNoteItem", fields: [original_item_id], references: [id])
+  credited_items DocumentItem[] @relation("CreditNoteItem")
+  storage        Storage?       @relation(fields: [storage_id], references: [id])
+  cost_center    CostCenter?    @relation(fields: [cost_center_id], references: [id])
+
+  taxes           DocumentItemTax[]
+  reception_items DocumentReceptionItem[]
+
+  @@index([document_id])
+  @@index([product_id])
+  @@index([storage_id])
+  @@index([cost_center_id])
+  @@index([original_item_id])
+  @@map("document_items")
+}
+
+// ============================================
+// DOCUMENT ITEM TAXES
+// ============================================
+
+model DocumentItemTax {
+  id               String  @id @default(uuid())
+  document_item_id String
+  tax_id           String?
+
+  tax_rate        Decimal  @db.Decimal(5, 2)
+  tax_amount      Decimal  @db.Decimal(19, 4)
+  per_unit_amount Decimal? @db.Decimal(19, 4)   // snapshot auditoría
+
+  created_at DateTime @default(now())
+
+  document_item DocumentItem @relation(fields: [document_item_id], references: [id], onDelete: Cascade)
+  tax           Tax?         @relation(fields: [tax_id], references: [id])
+
+  @@index([document_item_id])
+  @@index([tax_id])
+  @@map("document_item_taxes")
+}
+
+// ============================================
+// DOCUMENT WITHHOLDINGS (Retenciones)
+// ============================================
+
+model DocumentWithholding {
+  id             String  @id @default(uuid())
+  document_id    String
+  withholding_id String?
+  cost_center_id String?
+
+  rate   Decimal @db.Decimal(5, 2)
+  amount Decimal @db.Decimal(19, 4)
+
+  created_at DateTime @default(now())
+
+  document    Document    @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  withholding Tax?        @relation(fields: [withholding_id], references: [id])
+  cost_center CostCenter? @relation(fields: [cost_center_id], references: [id])
+
+  @@index([document_id])
+  @@index([withholding_id])
+  @@index([cost_center_id])
+  @@map("document_withholdings")
+}
+
+// ============================================
+// DOCUMENT ATTACHMENTS
+// ============================================
+
+model DocumentAttachment {
+  id          String @id @default(uuid())
+  document_id String
+  file_name   String
+  file_path   String
+
+  created_at DateTime @default(now())
+
+  document Document @relation(fields: [document_id], references: [id], onDelete: Cascade)
+
+  @@index([document_id])
+  @@map("document_attachments")
+}
+
+// ============================================
+// DOCUMENT AIU (Administración, Imprevistos, Utilidad)
+// ============================================
+
+model DocumentAiu {
+  id          String @id @default(uuid())
+  document_id String @unique
+
+  administrative            Decimal @default(0) @db.Decimal(19, 4)
+  administrative_percentage Decimal @default(0) @db.Decimal(5, 2)
+  unexpected                Decimal @default(0) @db.Decimal(19, 4)
+  unexpected_percentage     Decimal @default(0) @db.Decimal(5, 2)
+  utility                   Decimal @default(0) @db.Decimal(19, 4)
+  utility_percentage        Decimal @default(0) @db.Decimal(5, 2)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  document Document @relation(fields: [document_id], references: [id], onDelete: Cascade)
+
+  @@map("document_aius")
+}
+
+// ============================================
+// DOCUMENT RECEPTIONS (Recepciones de OC)
+// ============================================
+
+model DocumentReception {
+  id          String  @id @default(uuid())
+  document_id String
+  storage_id  String?
+  consecutive String? // RC-0001
+
+  status           Int       @default(0) @db.SmallInt // 0=borrador, 1=confirmada
+  received_by      String?
+  received_at      DateTime?
+  confirmed_by     String?
+  confirmed_at     DateTime?
+  annulled_by      String?
+  annulled_at      DateTime?
+  annulment_reason String?   @db.Text
+  notes            String?   @db.Text
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  document Document                @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  storage  Storage?                @relation(fields: [storage_id], references: [id])
+  items    DocumentReceptionItem[]
+
+  @@index([document_id])
+  @@index([storage_id])
+  @@index([status])
+  @@map("document_receptions")
+}
+
+model DocumentReceptionItem {
+  id               String  @id @default(uuid())
+  reception_id     String
+  document_item_id String?
+  product_id       String?
+  description      String?
+
+  quantity_received Decimal @db.Decimal(19, 4)
+  storage_id        String?
+
+  created_at DateTime @default(now())
+
+  reception     DocumentReception @relation(fields: [reception_id], references: [id], onDelete: Cascade)
+  document_item DocumentItem?     @relation(fields: [document_item_id], references: [id])
+
+  @@index([reception_id])
+  @@index([document_item_id])
+  @@index([product_id])
+  @@map("document_reception_items")
+}
+
+// ============================================
+// FIXED ASSETS (Activos Fijos)
+// ============================================
+
+model FixedAssetCategory {
+  id          String  @id @default(uuid())
+  key         String  @unique // LAND, MACHINERY, COMPUTER_EQUIPMENT, etc.
+  name        String // Terrenos, Maquinaria, Equipos de cómputo
+  is_tangible Boolean @default(true)
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  fixed_assets FixedAsset[]
+
+  @@map("fixed_asset_categories")
+}
+
+model FixedAsset {
+  id          String @id @default(uuid())
+  consecutive String @unique // AF-0001
+
+  // -- Identificación --
+  name        String
+  description String?
+  reference   String? // placa, serie, número de identificación
+  category_id String?
+  quantity    Int     @default(1)
+  image_path  String?
+
+  // -- Costos --
+  acquisition_date DateTime @db.Date
+  unit_cost        Decimal  @db.Decimal(19, 4)
+  total_cost       Decimal  @db.Decimal(19, 4)
+
+  // -- Depreciación --
+  residual_value           Decimal?                     @db.Decimal(19, 4)
+  calculation_basis        DepreciationCalculationBasis @default(USEFUL_LIFE)
+  useful_life_months       Int?
+  depreciation_rate        Decimal?                     @db.Decimal(5, 2) // % anual
+  depreciation_start_date  DateTime?                    @db.Date
+  last_depreciation_date   DateTime?                    @db.Date
+  accumulated_depreciation Decimal                      @default(0) @db.Decimal(19, 4)
+  net_book_value           Decimal                      @db.Decimal(19, 4)
+
+  // -- Cuentas Contables --
+  asset_account_code        String? // Cuenta del activo (15xxxx)
+  depreciation_account_code String? // Cuenta depreciación acumulada (159xxx)
+  expense_account_code      String? // Cuenta gasto depreciación (5260xx)
+
+  // -- Estado --
+  status FixedAssetStatus @default(ACTIVE)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  category FixedAssetCategory? @relation(fields: [category_id], references: [id])
+
+  asset_account        ChartOfAccount? @relation("FixedAssetAccount", fields: [asset_account_code], references: [code])
+  depreciation_account ChartOfAccount? @relation("FixedAssetDepreciationAccount", fields: [depreciation_account_code], references: [code])
+  expense_account      ChartOfAccount? @relation("FixedAssetExpenseAccount", fields: [expense_account_code], references: [code])
+
+  movements FixedAssetMovement[]
+
+  @@index([category_id])
+  @@index([status])
+  @@index([acquisition_date])
+  @@map("fixed_assets")
+}
+
+model FixedAssetMovement {
+  id             String @id @default(uuid())
+  fixed_asset_id String
+  consecutive    String @unique // AFM-0001
+
+  movement_type FixedAssetMovementType
+  description   String?
+  movement_date DateTime               @db.Date
+  movement_time DateTime               @db.Time(6)
+
+  // -- Cambios del Movimiento --
+  quantity_change     Decimal  @default(0) @db.Decimal(19, 4)
+  cost_change         Decimal  @default(0) @db.Decimal(19, 4)
+  depreciation_change Decimal  @default(0) @db.Decimal(19, 4)
+  book_value_change   Decimal? @db.Decimal(19, 4)
+
+  // -- Snapshot ANTES --
+  quantity_before     Decimal? @db.Decimal(19, 4)
+  cost_before         Decimal? @db.Decimal(19, 4)
+  depreciation_before Decimal? @db.Decimal(19, 4)
+  book_value_before   Decimal? @db.Decimal(19, 4)
+
+  // -- Snapshot DESPUÉS --
+  quantity_after     Decimal? @db.Decimal(19, 4)
+  cost_after         Decimal? @db.Decimal(19, 4)
+  depreciation_after Decimal? @db.Decimal(19, 4)
+  book_value_after   Decimal? @db.Decimal(19, 4)
+
+  // -- Auditoría --
+  journal_entry_id String?
+  created_by       String?
+  created_at       DateTime @default(now())
+
+  // Relations
+  fixed_asset     FixedAsset    @relation(fields: [fixed_asset_id], references: [id], onDelete: Cascade)
+  journal_entry   JournalEntry? @relation(fields: [journal_entry_id], references: [id])
+  created_by_user TenantUser?   @relation("FixedAssetMovementCreatedBy", fields: [created_by], references: [id])
+
+  @@index([fixed_asset_id])
+  @@index([movement_type])
+  @@index([movement_date])
+  @@index([journal_entry_id])
+  @@map("fixed_asset_movements")
+}
+
+// ============================================
+// BANK RECONCILIATION (Conciliación Bancaria)
+// ============================================
+
+model BankAdjustmentType {
+  id           String               @id @default(uuid())
+  name         String
+  direction    TransactionDirection
+  account_code String?
+  is_active    Boolean              @default(true)
+  created_at   DateTime             @default(now())
+
+  account ChartOfAccount?          @relation(fields: [account_code], references: [code])
+  items   BankReconciliationItem[]
+
+  @@index([direction])
+  @@map("bank_adjustment_types")
+}
+
+model BankReconciliation {
+  id              String @id @default(uuid())
+  bank_account_id String
+  consecutive     String @unique // BC-0001
+
+  reconciliation_date DateTime @db.Date
+  period_start        DateTime @db.Date
+  period_end          DateTime @db.Date
+
+  // -- Saldos Extracto --
+  extract_initial_balance Decimal @db.Decimal(19, 4)
+  extract_final_balance   Decimal @db.Decimal(19, 4)
+
+  // -- Saldos Sistema --
+  system_initial_balance Decimal @db.Decimal(19, 4)
+  system_final_balance   Decimal @db.Decimal(19, 4)
+
+  difference Decimal                  @db.Decimal(19, 4)
+  status     BankReconciliationStatus @default(PENDING)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  bank_account BankAccount              @relation(fields: [bank_account_id], references: [id])
+  items        BankReconciliationItem[]
+
+  @@index([bank_account_id])
+  @@index([status])
+  @@index([reconciliation_date])
+  @@map("bank_reconciliations")
+}
+
+model BankReconciliationItem {
+  id                String @id @default(uuid())
+  reconciliation_id String
+
+  source           BankReconciliationItemSource
+  transaction_date DateTime                     @db.Date
+  amount           Decimal                      @db.Decimal(19, 4)
+  direction        TransactionDirection
+  description      String?
+  reference        String? // Referencia del extracto
+
+  // -- Solo source=SYSTEM --
+  journal_entry_item_id String?
+
+  // -- Conciliación --
+  status             BankReconciliationItemStatus @default(PENDING)
+  matched_item_id    String?
+  adjustment_type_id String?
+  matched_at         DateTime?
+  matched_by         String?
+  notes              String?
+
+  created_at DateTime @default(now())
+
+  reconciliation     BankReconciliation       @relation(fields: [reconciliation_id], references: [id], onDelete: Cascade)
+  journal_entry_item JournalEntryItem?        @relation(fields: [journal_entry_item_id], references: [id])
+  matched_item       BankReconciliationItem?  @relation("MatchedItems", fields: [matched_item_id], references: [id])
+  matched_items      BankReconciliationItem[] @relation("MatchedItems")
+  adjustment_type    BankAdjustmentType?      @relation(fields: [adjustment_type_id], references: [id])
+  matched_by_user    TenantUser?              @relation("BankReconciliationMatchedBy", fields: [matched_by], references: [id])
+
+  @@index([reconciliation_id])
+  @@index([source])
+  @@index([status])
+  @@index([journal_entry_item_id])
+  @@index([matched_item_id])
+  @@map("bank_reconciliation_items")
+}
+
+// ============================================
+// CRM MODULE
+// ============================================
+
+// ---- Opportunity Stages (configurable per tenant) ----
+
+model CrmOpportunityStage {
+  id          String  @id @default(uuid())
+  value       String? @unique // slug identifier (optional during migration, will be populated)
+  name        String
+  position    Int
+  color       String  @default("#3B82F6")
+  probability Int     @default(0) // 0-100
+
+  is_won           Boolean @default(false)
+  is_lost          Boolean @default(false)
+  is_quoting_stage Boolean @default(false)
+  is_initial_stage Boolean @default(false)
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  opportunities CrmOpportunity[]
+
+  @@index([position])
+  @@index([is_active])
+  @@index([value])
+  @@map("crm_opportunity_stages")
+}
+
+// ---- Contact Tags ----
+
+model CrmContactTag {
+  id        String  @id @default(uuid())
+  name      String  @unique
+  color     String  @default("#3B82F6")
+  is_active Boolean @default(true)
+
+  assignments CrmContactTagAssignment[]
+
+  @@map("crm_contact_tags")
+}
+
+// ============================================
+// POS - PUNTO DE VENTA
+// ============================================
+
+model CashRegister {
+  id          String  @id @default(uuid())
+  consecutive String
+  name        String
+  description String?
+
+  // Cuenta de efectivo (REQUERIDA)
+  cash_account_id String
+
+  // Cuentas bancarias permitidas para cobrar [{bank_account_id, name}]
+  allowed_bank_accounts Json? @db.JsonB
+
+  // Referencias opcionales
+  storage_id     String?
+  cost_center_id String?
+  resolution_id  String?
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  cash_account BankAccount   @relation("CashRegisterCashAccount", fields: [cash_account_id], references: [id])
+  storage      Storage?      @relation(fields: [storage_id], references: [id])
+  cost_center  CostCenter?   @relation(fields: [cost_center_id], references: [id])
+  resolution   Resolution?   @relation(fields: [resolution_id], references: [id])
+  sessions     CashSession[]
+
+  @@index([cash_account_id])
+  @@index([storage_id])
+  @@index([cost_center_id])
+  @@map("cash_registers")
+}
+
+model CrmCampaign {
+  id              String          @id @default(uuid())
+  name            String
+  description     String?         @db.Text
+  channel         CampaignChannel
+  target_audience Json?
+
+  start_date DateTime  @db.Date
+  end_date   DateTime? @db.Date
+  budget     Decimal?  @db.Decimal(19, 4)
+
+  status CampaignStatus @default(ACTIVE)
+
+  whatsapp_template_sid    String?
+  whatsapp_template_params Json?
+
+  created_by String?
+  updated_by String?
+
+  is_active  Boolean   @default(true)
+  deleted_at DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  created_by_user TenantUser? @relation("CrmCampaignCreatedBy", fields: [created_by], references: [id])
+  updated_by_user TenantUser? @relation("CrmCampaignUpdatedBy", fields: [updated_by], references: [id])
+
+  leads             CrmLead[]
+  activities        CrmActivity[]
+  email_sends       EmailSend[]
+  whatsapp_messages CrmWhatsappMessage[]
+  lead_forms        CrmLeadForm[]
+
+  @@index([channel])
+  @@index([status])
+  @@index([start_date])
+  @@index([created_by])
+  @@index([updated_by])
+  @@index([is_active])
+  @@map("crm_campaigns")
+}
+
+// ---- Leads ----
+
+model CrmLead {
+  id             String  @id @default(uuid())
+  third_party_id String
+  campaign_id    String?
+
+  source LeadSource
+  stage  LeadStage  @default(NEW)
+
+  assigned_to String?
+
+  converted_at DateTime?
+
+  created_by String?
+  updated_by String?
+
+  is_active  Boolean   @default(true)
+  deleted_at DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  third_party     ThirdParty   @relation("CrmLeadContact", fields: [third_party_id], references: [id], onDelete: Cascade)
+  campaign        CrmCampaign? @relation(fields: [campaign_id], references: [id])
+  assigned_user   TenantUser?  @relation("CrmLeadAssignedTo", fields: [assigned_to], references: [id])
+  created_by_user TenantUser?  @relation("CrmLeadCreatedBy", fields: [created_by], references: [id])
+  updated_by_user TenantUser?  @relation("CrmLeadUpdatedBy", fields: [updated_by], references: [id])
+
+  activities        CrmActivity[]
+  opportunities     CrmOpportunity[]
+  whatsapp_messages CrmWhatsappMessage[]
+
+  @@index([third_party_id])
+  @@index([campaign_id])
+  @@index([assigned_to])
+  @@index([source])
+  @@index([stage])
+  @@index([created_by])
+  @@index([updated_by])
+  @@index([is_active])
+  @@map("crm_leads")
+}
+
+// ---- Opportunities ----
+
+model CrmOpportunity {
+  id             String  @id @default(uuid())
+  lead_id        String?
+  third_party_id String?
+
+  name           String
+  expected_value Decimal   @db.Decimal(19, 4)
+  stage_id       String
+  probability    Decimal   @db.Decimal(5, 2)
+  close_date     DateTime? @db.Date
+  won_at         DateTime?
+  lost_reason    String?   @db.Text
+
+  assigned_to    String?
+  cost_center_id String?
+
+  history Json?
+
+  created_by String?
+  updated_by String?
+
+  is_active  Boolean   @default(true)
+  deleted_at DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  lead            CrmLead?            @relation(fields: [lead_id], references: [id])
+  third_party     ThirdParty?         @relation("CrmOpportunityContact", fields: [third_party_id], references: [id])
+  stage           CrmOpportunityStage @relation(fields: [stage_id], references: [id])
+  assigned_user   TenantUser?         @relation("CrmOpportunityAssignedTo", fields: [assigned_to], references: [id])
+  cost_center     CostCenter?         @relation("CrmOpportunityCostCenter", fields: [cost_center_id], references: [id])
+  created_by_user TenantUser?         @relation("CrmOpportunityCreatedBy", fields: [created_by], references: [id])
+  updated_by_user TenantUser?         @relation("CrmOpportunityUpdatedBy", fields: [updated_by], references: [id])
+
+  activities        CrmActivity[]
+  documents         Document[]           @relation("OpportunityDocuments")
+  whatsapp_messages CrmWhatsappMessage[]
+
+  @@index([lead_id])
+  @@index([third_party_id])
+  @@index([stage_id])
+  @@index([assigned_to])
+  @@index([cost_center_id])
+  @@index([created_by])
+  @@index([updated_by])
+  @@index([is_active])
+  @@index([close_date])
+  @@map("crm_opportunities")
+}
+
+// ---- Activities ----
+
+model CrmActivity {
+  id             String  @id @default(uuid())
+  third_party_id String?
+  lead_id        String?
+  opportunity_id String?
+  user_id        String?
+  campaign_id    String?
+
+  type        CrmActivityType
+  subject     String
+  description String?         @db.Text
+
+  status       CrmActivityStatus @default(PENDING)
+  due_date     DateTime?
+  completed_at DateTime?
+
+  metadata Json?
+
+  created_by String?
+
+  is_active  Boolean   @default(true)
+  deleted_at DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  third_party     ThirdParty?     @relation("CrmActivityContact", fields: [third_party_id], references: [id])
+  lead            CrmLead?        @relation(fields: [lead_id], references: [id])
+  opportunity     CrmOpportunity? @relation(fields: [opportunity_id], references: [id])
+  user            TenantUser?     @relation("CrmActivityUser", fields: [user_id], references: [id])
+  campaign        CrmCampaign?    @relation(fields: [campaign_id], references: [id])
+  created_by_user TenantUser?     @relation("CrmActivityCreatedBy", fields: [created_by], references: [id])
+
+  scheduled_reminders CrmScheduledReminder[]
+
+  @@index([third_party_id])
+  @@index([lead_id])
+  @@index([opportunity_id])
+  @@index([user_id])
+  @@index([campaign_id])
+  @@index([type])
+  @@index([status])
+  @@index([due_date])
+  @@index([created_by])
+  @@index([is_active])
+  @@map("crm_activities")
+}
+
+// ---- Contact Tag Assignments (junction) ----
+
+model CrmContactTagAssignment {
+  id             String @id @default(uuid())
+  third_party_id String
+  tag_id         String
+
+  created_at DateTime @default(now())
+
+  third_party ThirdParty    @relation("CrmTagAssignmentContact", fields: [third_party_id], references: [id], onDelete: Cascade)
+  tag         CrmContactTag @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@unique([third_party_id, tag_id])
+  @@index([third_party_id])
+  @@index([tag_id])
+  @@map("crm_contact_tag_assignments")
+}
+
+// ---- Lead Forms ----
+
+model CrmLeadForm {
+  id          String  @id @default(uuid())
+  name        String
+  description String? @db.Text
+  slug        String  @unique
+
+  redirect_url String?
+  campaign_id  String?
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  campaign CrmCampaign? @relation(fields: [campaign_id], references: [id])
+
+  fields      CrmFormField[]
+  submissions CrmFormSubmission[]
+  automations CrmFormAutomation[]
+
+  @@index([slug])
+  @@index([campaign_id])
+  @@index([is_active])
+  @@map("crm_lead_forms")
+}
+
+model CrmFormField {
+  id          String  @id @default(uuid())
+  form_id     String
+  field_name  String
+  field_type  String
+  is_required Boolean @default(false)
+  position    Int
+  options     Json?
+
+  created_at DateTime @default(now())
+
+  form CrmLeadForm @relation(fields: [form_id], references: [id], onDelete: Cascade)
+
+  @@index([form_id])
+  @@index([position])
+  @@map("crm_form_fields")
+}
+
+model CrmFormSubmission {
+  id             String  @id @default(uuid())
+  form_id        String
+  third_party_id String?
+
+  data       Json
+  ip_address String?
+
+  submitted_at DateTime @default(now())
+
+  form        CrmLeadForm @relation(fields: [form_id], references: [id], onDelete: Cascade)
+  third_party ThirdParty? @relation("CrmFormSubmissionContact", fields: [third_party_id], references: [id])
+
+  @@index([form_id])
+  @@index([third_party_id])
+  @@index([submitted_at])
+  @@map("crm_form_submissions")
+}
+
+// ---- Automations ----
+
+// Automatización de mensajes al cambiar etapa de oportunidad
+model CrmOpportunityAutomation {
+  id                   String  @id @default(uuid())
+  name                 String? // Nombre descriptivo opcional
+  trigger_stage_from   String? // null = cualquier etapa origen
+  trigger_stage_to     String  // Etapa destino (requerido)
+  action_type          String  // 'email' | 'whatsapp'
+  email_template_id    String?
+  whatsapp_template_id String?
+
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  email_template    EmailTemplate?       @relation(fields: [email_template_id], references: [id], onDelete: SetNull)
+  whatsapp_template CrmWhatsappTemplate? @relation(fields: [whatsapp_template_id], references: [id], onDelete: SetNull)
+
+  @@index([trigger_stage_from, trigger_stage_to])
+  @@index([is_active])
+  @@map("crm_opportunity_automations")
+}
+
+// Automatización para crear actividades al cambiar etapa
+model CrmActivityAutomation {
+  id                   String  @id @default(uuid())
+  name                 String? // Nombre descriptivo opcional
+  trigger_stage_from   String? // null = cualquier etapa origen
+  trigger_stage_to     String  // Etapa destino (requerido)
+  activity_type        String  // 'TASK' | 'CALL' | 'MEETING' | 'EMAIL' | 'NOTE'
+  activity_subject     String
+  activity_description String?
+  days_offset          Int     @default(0) // Días después del trigger
+  assigned_to_rule     String  @default("same_as_owner") // 'same_as_owner' | 'specific_user'
+  assigned_to_user_id  String?
+
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  @@index([trigger_stage_from, trigger_stage_to])
+  @@index([is_active])
+  @@map("crm_activity_automations")
+}
+
+// Automatización al recibir envío de formulario
+model CrmFormAutomation {
+  id                      String  @id @default(uuid())
+  form_id                 String  @unique // Una automatización por formulario
+  create_lead             Boolean @default(true)
+  lead_stage              String? // Etapa inicial del lead
+  lead_source             String? // Source del lead
+  create_opportunity      Boolean @default(false)
+  opportunity_stage_id    String? // Etapa inicial de la oportunidad
+  opportunity_value       Float?
+  opportunity_probability Int?
+  assignment_type         String  @default("none") // 'none' | 'round_robin' | 'specific_user'
+  assigned_user_id        String?
+  round_robin_users       Json?   // UUID[] - usuarios para rotación
+  round_robin_index       Int     @default(0)
+  send_notification       Boolean @default(false)
+  auto_response_enabled   Boolean @default(false)
+  auto_response_template_id String?
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  form                   CrmLeadForm       @relation(fields: [form_id], references: [id], onDelete: Cascade)
+  auto_response_template EmailTemplate? @relation("FormAutoResponse", fields: [auto_response_template_id], references: [id], onDelete: SetNull)
+
+  @@index([is_active])
+  @@map("crm_form_automations")
+}
+
+// Automatización basada en eventos (cumpleaños, fechas, facturación)
+model CrmEventAutomation {
+  id                   String  @id @default(uuid())
+  name                 String
+  description          String?
+  event_type           String  // 'birthday' | 'opportunity_won' | 'opportunity_lost' | 'year_end' | 'custom_date' | 'invoice_created' | 'invoice_paid' | 'quote_accepted' | 'quote_rejected'
+  action_type          String  // 'email' | 'whatsapp' | 'both'
+  email_template_id    String?
+  whatsapp_template_id String?
+  target_segments      Json?   // string[] - filtrar por tags de contacto
+  delay_minutes        Int     @default(0)
+  custom_time          String? // 'HH:mm' - hora de envío para eventos programados
+  custom_date          DateTime? // Para event_type = 'custom_date'
+  execution_count      Int     @default(0)
+  last_executed_at     DateTime?
+  applies_to_terceros  Boolean @default(false) // Para eventos de cartera/facturación
+
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  email_template    EmailTemplate?       @relation(fields: [email_template_id], references: [id], onDelete: SetNull)
+  whatsapp_template CrmWhatsappTemplate? @relation(fields: [whatsapp_template_id], references: [id], onDelete: SetNull)
+
+  @@index([event_type])
+  @@index([is_active])
+  @@map("crm_event_automations")
+}
+
+// Log de ejecución de automatizaciones
+model CrmAutomationLog {
+  id              String   @id @default(uuid())
+  automation_type String   // 'opportunity' | 'activity' | 'form' | 'event' | 'reminder'
+  automation_id   String
+  trigger_data    Json     // Datos del evento que disparó la automatización
+  action_data     Json     // Datos de la acción ejecutada
+  status          String   // 'success' | 'failed' | 'skipped'
+  error_message   String?
+  executed_at     DateTime @default(now())
+
+  @@index([automation_type, automation_id])
+  @@index([status])
+  @@index([executed_at])
+  @@map("crm_automation_logs")
+}
+
+// ---- Meeting Reminders ----
+
+model CrmMeetingReminderConfig {
+  id                       String  @id @default(uuid())
+  default_reminder_minutes Int[]   // [1440, 60] = 24h y 1h antes
+  send_to_assigned         Boolean @default(true)
+  send_to_contact          Boolean @default(true)
+  subject_template         String? // Template del asunto con variables
+  body_template            String? @db.Text // Template del cuerpo (HTML)
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("crm_meeting_reminder_configs")
+}
+
+model CrmScheduledReminder {
+  id                      String    @id @default(uuid())
+  activity_id             String
+  remind_at               DateTime
+  reminder_minutes_before Int
+  recipient_type          String    @default("assigned") // 'assigned' | 'contact' | 'both'
+  recipient_email         String?
+  status                  String    @default("pending") // 'pending' | 'sent' | 'failed' | 'cancelled'
+  sent_at                 DateTime?
+  error_message           String?
+
+  created_at DateTime @default(now())
+
+  activity CrmActivity @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+
+  @@index([activity_id])
+  @@index([remind_at])
+  @@index([status])
+  @@map("crm_scheduled_reminders")
+}
+
+// ---- Email Template Types ----
+
+model EmailTemplateType {
+  id          String   @id @default(uuid())
+  name        String
+  module_key  String?  @unique
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  templates EmailTemplate[]
+
+  @@index([module_key])
+  @@map("email_template_types")
+}
+
+// ---- Email Templates & Sends ----
+
+model EmailTemplate {
+  id        String @id @default(uuid())
+  name      String
+  subject   String
+  body_html String @db.Text
+  variables Json?
+  type_id   String?
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  type                     EmailTemplateType?        @relation(fields: [type_id], references: [id])
+  email_sends              EmailSend[]
+  opportunity_automations  CrmOpportunityAutomation[]
+  event_automations        CrmEventAutomation[]
+  form_auto_responses      CrmFormAutomation[]        @relation("FormAutoResponse")
+
+  @@index([is_active])
+  @@index([type_id])
+  @@map("crm_email_templates")
+}
+
+model EmailSend {
+  id             String  @id @default(uuid())
+  template_id    String?
+  third_party_id String?
+  campaign_id    String?
+
+  subject   String
+  body_html String @db.Text
+
+  status         MessageStatus @default(PENDING)
+  sent_at        DateTime?
+  opened_at      DateTime?
+  clicked_at     DateTime?
+  bounced_at     DateTime?
+  failure_reason String?       @db.Text
+
+  created_at DateTime @default(now())
+
+  template    EmailTemplate? @relation(fields: [template_id], references: [id])
+  third_party ThirdParty?    @relation("CrmEmailSendContact", fields: [third_party_id], references: [id])
+  campaign    CrmCampaign?   @relation(fields: [campaign_id], references: [id])
+
+  @@index([template_id])
+  @@index([third_party_id])
+  @@index([campaign_id])
+  @@index([status])
+  @@index([sent_at])
+  @@map("crm_email_sends")
+}
+
+// ---- WhatsApp ----
+
+model CrmWhatsappTemplate {
+  id            String @id @default(uuid())
+  name          String
+  template_sid  String @unique
+  language      String @default("es")
+  body_template String @db.Text
+  variables     Json?
+
+  // Twilio template details
+  template_type    String? // text, media, quick_reply, call_to_action, card
+  template_config  Json?   // Estructura completa del template Twilio
+  header_text      String?
+  footer_text      String?
+  buttons          Json?
+  media_url        String?
+  twilio_status    String? // approved, pending, rejected
+  variable_mapping Json?   // {"1": {source: "contact_field", field: "first_name"}, ...}
+  last_synced_at   DateTime?
+
+  status    String  @default("PENDING")
+  is_active Boolean @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  opportunity_automations CrmOpportunityAutomation[]
+  event_automations       CrmEventAutomation[]
+
+  @@index([status])
+  @@index([is_active])
+  @@index([twilio_status])
+  @@map("crm_whatsapp_templates")
+}
+
+model CrmWhatsappConversation {
+  id             String @id @default(uuid())
+  third_party_id String
+  phone_number   String
+
+  is_active               Boolean   @default(true)
+  status                  String    @default("open") // open, pending, closed
+  assigned_to             String?
+  last_message_at         DateTime?
+  last_inbound_message_at DateTime?
+  unread_count            Int       @default(0)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  third_party   ThirdParty  @relation("CrmWhatsappConversationContact", fields: [third_party_id], references: [id], onDelete: Cascade)
+  assigned_user TenantUser? @relation("CrmWhatsappConversationAssigned", fields: [assigned_to], references: [id], onDelete: SetNull)
+
+  messages CrmWhatsappMessage[]
+
+  @@index([third_party_id])
+  @@index([phone_number])
+  @@index([is_active])
+  @@index([status])
+  @@index([assigned_to])
+  @@index([last_message_at])
+  @@map("crm_whatsapp_conversations")
+}
+
+model CrmWhatsappMessage {
+  id              String  @id @default(uuid())
+  conversation_id String?
+  third_party_id  String?
+  lead_id         String?
+  opportunity_id  String?
+  campaign_id     String?
+
+  direction       MessageDirection
+  phone_number    String
+  message_type    String
+  message_content String           @db.Text
+
+  template_name   String?
+  template_params Json?
+
+  status         MessageStatus @default(PENDING)
+  sent_at        DateTime?
+  delivered_at   DateTime?
+  read_at        DateTime?
+  failed_at      DateTime?
+  failure_reason String?       @db.Text
+
+  user_id               String?
+  replied_to_message_id String?
+  media_url             String?
+  media_content_type    String?
+  twilio_sid            String?  @unique
+  metadata              Json?
+
+  created_at DateTime @default(now())
+
+  conversation CrmWhatsappConversation? @relation(fields: [conversation_id], references: [id])
+  third_party  ThirdParty?              @relation("CrmWhatsappMessageContact", fields: [third_party_id], references: [id])
+  lead         CrmLead?                 @relation(fields: [lead_id], references: [id])
+  opportunity  CrmOpportunity?          @relation(fields: [opportunity_id], references: [id])
+  campaign     CrmCampaign?             @relation(fields: [campaign_id], references: [id])
+  user         TenantUser?              @relation("CrmWhatsappMessageUser", fields: [user_id], references: [id])
+
+  @@index([conversation_id])
+  @@index([third_party_id])
+  @@index([lead_id])
+  @@index([opportunity_id])
+  @@index([campaign_id])
+  @@index([user_id])
+  @@index([direction])
+  @@index([status])
+  @@index([sent_at])
+  @@map("crm_whatsapp_messages")
+}
+
+// ---- CRM Segmentation Config ----
+
+model CrmSegmentationConfig {
+  id                    String    @id @default(uuid())
+  frequent_days         Int       @default(30)
+  inactive_days         Int       @default(90)
+  high_value_threshold  Decimal   @default(5000000) @db.Decimal(19, 4)
+  new_client_days       Int       @default(60)
+  auto_recalculate      Boolean   @default(false)
+  recalculate_frequency String    @default("manual")
+  last_calculated_at    DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("crm_segmentation_configs")
+}
+
+model CashSession {
+  id          String @id @default(uuid())
+  consecutive String
+
+  cash_register_id String
+  opened_by        String
+  closed_by        String?
+
+  opened_at DateTime  @default(now())
+  closed_at DateTime?
+
+  opening_amount  Decimal  @db.Decimal(19, 4)
+  closing_amount  Decimal? @db.Decimal(19, 4) // Conteo físico
+  expected_amount Decimal? @db.Decimal(19, 4) // Calculado
+  difference      Decimal? @db.Decimal(19, 4) // closing - expected
+
+  status CashSessionStatus @default(OPEN)
+  notes  String?
+
+  created_at DateTime @default(now())
+
+  // Relations
+  cash_register  CashRegister   @relation(fields: [cash_register_id], references: [id])
+  opened_by_user TenantUser     @relation("CashSessionOpenedBy", fields: [opened_by], references: [id])
+  closed_by_user TenantUser?    @relation("CashSessionClosedBy", fields: [closed_by], references: [id])
+  movements      CashMovement[]
+
+  @@index([cash_register_id])
+  @@index([opened_by])
+  @@index([status])
+  @@map("cash_sessions")
+}
+
+model CashMovement {
+  id          String @id @default(uuid())
+  consecutive String
+
+  cash_session_id String
+  movement_type   CashMovementType
+  document_id     String
+  third_party_id  String
+
+  // Monto que queda a crédito (CxC)
+  cxc_amount Decimal @default(0) @db.Decimal(19, 4)
+
+  // Distribución de pagos [{bank_account_id, amount}]
+  payments Json? @db.JsonB
+
+  movement_time DateTime @default(now())
+  created_at    DateTime @default(now())
+
+  // Relations
+  cash_session CashSession @relation(fields: [cash_session_id], references: [id])
+  document     Document    @relation(fields: [document_id], references: [id])
+  third_party  ThirdParty  @relation(fields: [third_party_id], references: [id])
+
+  @@index([cash_session_id])
+  @@index([document_id])
+  @@index([third_party_id])
+  @@map("cash_movements")
+}
+
+// ============================================
+// EXOGENOUS (Reportes DIAN)
+// ============================================
+
+enum ExogenousFileStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model CompanyExogenousFormat {
+  id   String @id @default(uuid())
+  year Int
+  code String // 1001, 1003, etc.
+  name String
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  concepts CompanyExogenousConcept[]
+
+  @@unique([year, code])
+  @@index([year])
+  @@map("company_exogenous_formats")
+}
+
+model CompanyExogenousConcept {
+  id                          String @id @default(uuid())
+  company_exogenous_format_id String
+  code                        String // 5001, 5002, etc.
+  name                        String
+
+  // Cuenta 1
+  account_id_1   String?
+  account_code_1 String?
+  account_name_1 String?
+
+  // Cuenta 2
+  account_id_2   String?
+  account_code_2 String?
+  account_name_2 String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  format CompanyExogenousFormat @relation(fields: [company_exogenous_format_id], references: [id], onDelete: Cascade)
+
+  @@unique([company_exogenous_format_id, code])
+  @@index([company_exogenous_format_id])
+  @@map("company_exogenous_concepts")
+}
+
+model ExogenousFile {
+  id          String @id @default(uuid())
+  format_code String
+  format_name String
+  format_year Int
+  consecutive Int // NumEnvio (1, 2, 3...)
+
+  file_name     String // EX-001-1001-2024.xml
+  file_path     String // exogenous/2024/1001/...
+  file_size     BigInt?
+  total_entries Int?
+
+  status        ExogenousFileStatus @default(PROCESSING)
+  error_message String?
+
+  created_at   DateTime  @default(now())
+  completed_at DateTime?
+
+  @@unique([format_year, format_code, consecutive])
+  @@index([format_year])
+  @@index([status])
+  @@map("exogenous_files")
+}
+
+// ============================================
+// TAX REPORTS (Reportes de Impuestos)
+// ============================================
+
+enum TaxReportTaxType {
+  IVA
+  INC
+  RETEFUENTE
+  RETEICA
+  RETEIVA
+}
+
+enum TaxReportStatus {
+  DRAFT
+  CAUSED
+  PAID
+}
+
+enum TaxPeriodType {
+  MONTHLY
+  BIMONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+enum TaxReportItemType {
+  IVA_GENERATED
+  IVA_DESCONTABLE
+  IVA_FAVOR
+  RETEIVA_FAVOR
+  RETEIVA_PAYABLE
+  RETEFUENTE_PAYABLE
+  RETEICA_PAYABLE
+  INC_GENERATED
+}
+
+enum PayrollSettlementType {
+  REGULAR
+  PRIMA
+  CESANTIAS
+  VACACIONES
+  TERMINACION
+}
+
+enum PayrollSettlementStatus {
+  DRAFT
+  CALCULATED
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+model TaxReport {
+  id          String @id @default(uuid())
+  consecutive String // IM-0001
+
+  // Clasificación
+  tax_type     TaxReportTaxType
+  period_type  TaxPeriodType
+  period_start DateTime         @db.Date
+  period_end   DateTime         @db.Date
+  year         Int
+
+  // Montos
+  iva_generated      Decimal @default(0) @db.Decimal(19, 4)
+  iva_descontable    Decimal @default(0) @db.Decimal(19, 4)
+  iva_favor          Decimal @default(0) @db.Decimal(19, 4)
+  iva_reteiva_favor  Decimal @default(0) @db.Decimal(19, 4)
+  inc_generated      Decimal @default(0) @db.Decimal(19, 4)
+  reteiva_payable    Decimal @default(0) @db.Decimal(19, 4)
+  retefuente_payable Decimal @default(0) @db.Decimal(19, 4)
+  reteica_payable    Decimal @default(0) @db.Decimal(19, 4)
+  net_amount         Decimal @default(0) @db.Decimal(19, 4)
+
+  // Estado
+  status        TaxReportStatus @default(DRAFT)
+  emission_date DateTime        @db.Date
+  due_date      DateTime        @db.Date
+
+  // Integración ArAp (CxP creada al causar)
+  ar_ap_id String?
+
+  // Contabilización
+  journal_entry_id String?
+
+  // Auditoría
+  created_by String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relaciones
+  items TaxReportItem[]
+
+  @@unique([tax_type, period_start, period_end])
+  @@index([tax_type])
+  @@index([year])
+  @@index([status])
+  @@index([ar_ap_id])
+  @@map("tax_reports")
+}
+
+model TaxReportItem {
+  id                    String            @id @default(uuid())
+  tax_report_id         String
+  journal_entry_item_id String
+  type                  TaxReportItemType
+  base_amount           Decimal           @db.Decimal(19, 4)
+  tax_amount            Decimal           @db.Decimal(19, 4)
+  created_at            DateTime          @default(now())
+
+  // Relaciones
+  tax_report TaxReport @relation(fields: [tax_report_id], references: [id], onDelete: Cascade)
+
+  @@index([tax_report_id])
+  @@index([journal_entry_item_id])
+  @@map("tax_report_items")
+}
+
+// ============================================
+// API LOG (Registro de envíos a DIAN/API)
+// ============================================
+
+enum ApiLogReferenceType {
+  // Facturación Electrónica
+  INVOICE
+  CREDIT_NOTE
+  DEBIT_NOTE
+
+  // Nómina Electrónica
+  PAYROLL
+  PAYROLL_ADJUST_NOTE
+
+  // Compras
+  PURCHASE
+  PURCHASE_RETURN
+
+  // Gastos
+  EXPENSE
+  EXPENSE_RETURN
+
+  // Habilitación (Test Sets)
+  INVOICE_HABILITATION
+  PAYROLL_HABILITATION
+  PAYROLL_ADJUST_NOTE_HABILITATION
+}
+
+model ApiLog {
+  id              String               @id @default(uuid())
+  reference_id    String?
+  reference_type  ApiLogReferenceType
+  json_request    Json                 @db.JsonB
+  json_response   Json?                @db.JsonB
+  status_response Boolean              @default(false)
+  url_pdf         String?              @db.VarChar(255)
+  date_sent       DateTime             @default(now()) @db.Timestamptz()
+  created_at      DateTime             @default(now()) @db.Timestamptz()
+  updated_at      DateTime             @updatedAt @db.Timestamptz()
+
+  @@index([reference_id])
+  @@index([reference_type])
+  @@index([date_sent])
+  @@map("apilog")
+}
+
+// ============================================
+// AI CHAT
+// ============================================
+
+model AIChatSession {
+  id              String    @id @default(uuid())
+  user_id         String
+  title           String?
+  module_id       String?
+  is_active       Boolean   @default(true)
+  last_message_at DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  messages AIChatMessage[]
+
+  @@index([user_id])
+  @@index([created_at])
+  @@map("ai_chat_sessions")
+}
+
+model AIChatMessage {
+  id               String   @id @default(uuid())
+  session_id       String
+  user_id          String
+  role             String // 'user' | 'assistant'
+  content          String   @db.Text
+  module_id        String?
+  provider         String?
+  model            String?
+  tokens_used      Int?
+  response_time_ms Int?
+  feedback         String? // 'helpful' | 'not_helpful'
+  rating           Int?
+  created_at       DateTime @default(now())
+
+  session AIChatSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
+
+  @@index([session_id])
+  @@index([user_id])
+  @@index([created_at])
+  @@map("ai_chat_messages")
+}
+
+// ============================================
+// PAYROLL WITHHOLDING UVT (Tabla de Retención en la Fuente)
+// ============================================
+
+model PayrollWithholdingUvt {
+  id            String   @id @default(uuid())
+  year          Int
+  procedure     Int      @default(1) // Procedimiento 1 o 2 de retención
+  from_uvt      Decimal  @db.Decimal(10, 2)
+  to_uvt        Decimal? @db.Decimal(10, 2) // null = último tramo (infinito)
+  fixed_fee_uvt Decimal  @db.Decimal(10, 2) @default(0)
+  marginal_rate Decimal  @db.Decimal(10, 6) // ej: 0.19 = 19%
+  subtract_uvt  Decimal  @db.Decimal(10, 2) @default(0)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@unique([year, procedure, from_uvt])
+  @@index([year, procedure])
+  @@map("payroll_withholding_uvt")
+}
+
+// ==================== PAYROLL SETTLEMENTS ====================
+
+model PayrollSettlement {
+  id                String                  @id @default(uuid())
+  settlement_name   String
+  settlement_number String?                 @unique
+  settlement_type   PayrollSettlementType   @default(REGULAR)
+  start_date        DateTime                @db.Date
+  end_date          DateTime                @db.Date
+  payment_date      DateTime?               @db.Date
+  status            PayrollSettlementStatus @default(DRAFT)
+
+  liquidate_prima              Boolean @default(false)
+  liquidate_cesantias          Boolean @default(false)
+  liquidate_cesantias_interest Boolean @default(false)
+  liquidate_vacaciones         Boolean @default(false)
+
+  total_employees              Int       @default(0)
+  total_accrued                Decimal   @default(0) @db.Decimal(18, 4)
+  total_deductions             Decimal   @default(0) @db.Decimal(18, 4)
+  total_net_salary             Decimal   @default(0) @db.Decimal(18, 4)
+  total_employer_contributions Decimal   @default(0) @db.Decimal(18, 4)
+  total_provisions             Decimal   @default(0) @db.Decimal(18, 4)
+  total_payroll_cost           Decimal   @default(0) @db.Decimal(18, 4)
+
+  is_last_of_month Boolean @default(false)
+  year             Int
+  month            Int
+  period_number    Int     @default(1)
+
+  termination_reason String?
+
+  notes          String?
+  calculated_at  DateTime?
+  approved_by_id String?
+  approved_at    DateTime?
+  created_by_id  String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  details PayrollSettlementDetail[]
+
+  @@index([status])
+  @@index([settlement_type])
+  @@index([year, month])
+  @@map("payroll_settlements")
+}
+
+model PayrollSettlementDetail {
+  id                    String @id @default(uuid())
+  payroll_settlement_id String
+  third_party_id        String
+
+  employee_name                String
+  employee_document            String?
+  employee_position            String?
+  employee_base_salary         Decimal              @db.Decimal(18, 4)
+  employee_salary_type         SalaryType           @default(ORDINARIO)
+  employee_contract_type       String?
+  employee_worker_type_code    String?
+  employee_worker_subtype_code String?
+  employee_is_administrative   Boolean              @default(false)
+  employee_arl_rate            Decimal?             @db.Decimal(8, 4)
+  employee_includes_transport  Boolean              @default(true)
+
+  days_worked  Int      @default(30)
+  hours_worked Decimal? @db.Decimal(8, 2)
+
+  payroll_data Json @default("{}")
+  input_data   Json @default("{}") // User-provided: bonuses, aids, other_income
+
+  total_accrued                Decimal @default(0) @db.Decimal(18, 4)
+  total_deductions             Decimal @default(0) @db.Decimal(18, 4)
+  net_salary                   Decimal @default(0) @db.Decimal(18, 4)
+  total_employer_contributions Decimal @default(0) @db.Decimal(18, 4)
+  total_provisions             Decimal @default(0) @db.Decimal(18, 4)
+  total_cost                   Decimal @default(0) @db.Decimal(18, 4)
+
+  status        PayrollSettlementStatus @default(DRAFT)
+  error_message String?
+  notes         String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  payroll_settlement PayrollSettlement @relation(fields: [payroll_settlement_id], references: [id], onDelete: Cascade)
+  third_party        ThirdParty        @relation("ThirdPartyPayrollDetails", fields: [third_party_id], references: [id])
+
+  @@unique([payroll_settlement_id, third_party_id])
+  @@index([payroll_settlement_id])
+  @@index([third_party_id])
+  @@map("payroll_settlement_details")
+}
+// ============================================
+// PROPIEDAD HORIZONTAL (PH)
+// ============================================
+
+model PhCondominium {
+  id              String   @id @default(uuid())
+  company_id      String
+  name            String
+  nit             String?
+  address         String?
+  department_id   String?
+  municipality_id String?
+  phone           String?
+  email           String?
+  admin_company_id String?
+  total_units     Int?     @default(0)
+  price_per_m2    Decimal? @db.Decimal(15, 2)
+  logo_url        String?
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  created_by      String?
+
+  towers          PhTower[]
+  units           PhUnit[]
+  common_areas    PhCommonArea[]
+  billing_periods PhBillingPeriod[]
+  unit_rentals    PhUnitRental[]
+  billing_configs      PhBillingConfig[]
+  insurance_policies   PhInsurancePolicy[]
+  maintenance_plans    PhMaintenancePlan[]
+  documents            PhDocument[]
+  assemblies           PhAssembly[]
+  pqrs                 PhPqrs[]
+  comunicados          PhComunicado[]
+  access_logs          PhAccessLog[]
+  packages             PhPackage[]
+  minuta_entries       PhMinutaEntry[]
+
+  @@index([company_id])
+  @@map("ph_condominiums")
+}
+
+model PhTower {
+  id             String   @id @default(uuid())
+  condominium_id String
+  name           String
+  code           String?
+  total_floors   Int?
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  condominium PhCondominium @relation(fields: [condominium_id], references: [id], onDelete: Cascade)
+  units       PhUnit[]
+
+  @@index([condominium_id])
+  @@map("ph_towers")
+}
+
+model PhUnitType {
+  id              String   @id @default(uuid())
+  company_id      String
+  name            String
+  code            String?
+  description     String?
+  is_rentable     Boolean  @default(false)
+  is_parking      Boolean  @default(false)
+  free_minutes    Int?     @default(0)
+  rental_fee      Decimal? @db.Decimal(15, 2)
+  rental_fee_type String?
+  fee_concept_id  String?
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  units PhUnit[]
+
+  @@index([company_id])
+  @@map("ph_unit_types")
+}
+
+model PhUnit {
+  id             String   @id @default(uuid())
+  condominium_id String
+  tower_id       String?
+  unit_type_id   String?
+  unit_number    String
+  floor          Int?
+  area_m2        Decimal? @db.Decimal(10, 2)
+  coefficient    Decimal? @db.Decimal(10, 6)
+  parent_unit_id String?
+  is_active      Boolean  @default(true)
+  notes          String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+  created_by     String?
+
+  condominium PhCondominium  @relation(fields: [condominium_id], references: [id], onDelete: Cascade)
+  tower       PhTower?       @relation(fields: [tower_id], references: [id])
+  unit_type   PhUnitType?    @relation(fields: [unit_type_id], references: [id])
+  parent_unit PhUnit?        @relation("UnitHierarchy", fields: [parent_unit_id], references: [id])
+  child_units PhUnit[]       @relation("UnitHierarchy")
+
+  residents    PhUnitResident[]
+  vehicles     PhVehicle[]
+  fees         PhFee[]
+  reservations PhCommonAreaReservation[]
+  rentals_as_unit   PhUnitRental[] @relation("RentalUnit")
+  rentals_as_renter PhUnitRental[] @relation("RenterUnit")
+  maintenance_plans PhMaintenancePlan[]
+  access_logs       PhAccessLog[]
+  packages          PhPackage[]
+
+  @@index([condominium_id])
+  @@index([tower_id])
+  @@index([unit_type_id])
+  @@map("ph_units")
+}
+
+model PhUnitResident {
+  id            String    @id @default(uuid())
+  unit_id       String
+  tercero_id    String
+  resident_type String
+  is_primary    Boolean   @default(false)
+  move_in_date  DateTime?
+  move_out_date DateTime?
+  is_active     Boolean   @default(true)
+  notes         String?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  unit PhUnit @relation(fields: [unit_id], references: [id], onDelete: Cascade)
+
+  vehicles PhVehicle[]
+  fees     PhFee[]
+
+  @@index([unit_id])
+  @@index([tercero_id])
+  @@map("ph_unit_residents")
+}
+
+model PhVehicle {
+  id             String   @id @default(uuid())
+  unit_id        String
+  resident_id    String?
+  vehicle_type   String
+  brand          String?
+  model          String?
+  year           Int?
+  color          String?
+  plate          String?
+  sticker_number String?
+  parking_space  String?
+  is_active      Boolean  @default(true)
+  notes          String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  unit     PhUnit          @relation(fields: [unit_id], references: [id], onDelete: Cascade)
+  resident PhUnitResident? @relation(fields: [resident_id], references: [id])
+
+  @@index([unit_id])
+  @@map("ph_vehicles")
+}
+
+model PhFeeConcept {
+  id               String   @id @default(uuid())
+  company_id       String
+  name             String
+  code             String?
+  description      String?
+  default_amount   Decimal? @db.Decimal(15, 2)
+  is_recurring     Boolean  @default(true)
+  calculation_type String   @default("fixed")
+  is_active        Boolean  @default(true)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  fees                       PhFee[]
+  billing_config_associations PhBillingConfigConcept[]
+
+  @@index([company_id])
+  @@map("ph_fee_concepts")
+}
+
+model PhBillingPeriod {
+  id             String    @id @default(uuid())
+  condominium_id String
+  name           String
+  year           Int
+  month          Int
+  due_date       DateTime?
+  notes          String?
+  status         String    @default("draft")
+  generated_at   DateTime?
+  closed_at      DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  created_by     String?
+
+  condominium PhCondominium @relation(fields: [condominium_id], references: [id], onDelete: Cascade)
+  fees        PhFee[]
+
+  @@unique([condominium_id, year, month])
+  @@index([condominium_id])
+  @@map("ph_billing_periods")
+}
+
+model PhFee {
+  id                String    @id @default(uuid())
+  billing_period_id String
+  unit_id           String
+  fee_concept_id    String
+  resident_id       String?
+  amount            Decimal   @db.Decimal(15, 2)
+  balance           Decimal   @db.Decimal(15, 2)
+  status            String    @default("pending")
+  due_date          DateTime?
+  paid_at           DateTime?
+  fee_type          String    @default("regular")
+  parent_fee_id     String?
+  notes             String?
+  email_sent_at     DateTime?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  billing_period PhBillingPeriod @relation(fields: [billing_period_id], references: [id], onDelete: Cascade)
+  unit           PhUnit          @relation(fields: [unit_id], references: [id])
+  fee_concept    PhFeeConcept    @relation(fields: [fee_concept_id], references: [id])
+  resident       PhUnitResident? @relation(fields: [resident_id], references: [id])
+  parent_fee     PhFee?          @relation("FeeHierarchy", fields: [parent_fee_id], references: [id])
+  child_fees     PhFee[]         @relation("FeeHierarchy")
+  payments       PhPayment[]
+
+  @@index([billing_period_id])
+  @@index([unit_id])
+  @@index([fee_concept_id])
+  @@map("ph_fees")
+}
+
+model PhPayment {
+  id             String   @id @default(uuid())
+  fee_id         String
+  amount         Decimal  @db.Decimal(15, 2)
+  payment_date   DateTime @default(now())
+  payment_method String?
+  reference      String?
+  notes          String?
+  receipt_url    String?
+  created_by     String?
+  created_at     DateTime @default(now())
+
+  fee PhFee @relation(fields: [fee_id], references: [id], onDelete: Cascade)
+
+  @@index([fee_id])
+  @@map("ph_payments")
+}
+
+model PhCommonArea {
+  id                String   @id @default(uuid())
+  condominium_id    String
+  name              String
+  description       String?
+  capacity          Int?
+  rental_fee        Decimal? @db.Decimal(15, 2)
+  requires_deposit  Boolean  @default(false)
+  deposit_amount    Decimal? @db.Decimal(15, 2)
+  requires_approval Boolean  @default(false)
+  min_hours         Int?
+  max_hours         Int?
+  available_from    String?
+  available_to      String?
+  available_days    Int[]    @default([0, 1, 2, 3, 4, 5, 6])
+  is_active         Boolean  @default(true)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+  created_by        String?
+
+  condominium  PhCondominium            @relation(fields: [condominium_id], references: [id], onDelete: Cascade)
+  reservations PhCommonAreaReservation[]
+
+  @@index([condominium_id])
+  @@map("ph_common_areas")
+}
+
+model PhCommonAreaReservation {
+  id                  String    @id @default(uuid())
+  common_area_id      String
+  unit_id             String?
+  tercero_id          String?
+  reservation_date    DateTime
+  start_time          String
+  end_time            String
+  status              String    @default("pending")
+  total_fee           Decimal?  @db.Decimal(15, 2)
+  deposit_paid        Boolean   @default(false)
+  notes               String?
+  cancelled_at        DateTime?
+  cancelled_by        String?
+  cancellation_reason String?
+  confirmed_at        DateTime?
+  confirmed_by        String?
+  reminder_sent       Boolean   @default(false)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  created_by          String?
+
+  common_area PhCommonArea @relation(fields: [common_area_id], references: [id], onDelete: Cascade)
+  unit        PhUnit?      @relation(fields: [unit_id], references: [id])
+
+  @@index([common_area_id])
+  @@index([reservation_date])
+  @@map("ph_common_area_reservations")
+}
+
+model PhUnitRental {
+  id               String    @id @default(uuid())
+  unit_id          String
+  renter_unit_id   String
+  condominium_id   String
+  start_time       DateTime
+  end_time         DateTime?
+  total_minutes    Int?
+  billable_minutes Int?
+  amount           Decimal?  @db.Decimal(15, 2)
+  fee_id           String?
+  status           String    @default("active")
+  notes            String?
+  created_by       String?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  unit        PhUnit        @relation("RentalUnit", fields: [unit_id], references: [id])
+  renter_unit PhUnit        @relation("RenterUnit", fields: [renter_unit_id], references: [id])
+  condominium PhCondominium @relation(fields: [condominium_id], references: [id])
+
+  @@index([unit_id])
+  @@index([renter_unit_id])
+  @@index([condominium_id])
+  @@map("ph_unit_rentals")
+}
+
+model PhBillingConfig {
+  id                      String    @id @default(uuid())
+  condominium_id          String
+  config_type             String
+  name                    String
+  description             String?
+  value_type              String    @default("percentage")
+  value                   Decimal   @db.Decimal(15, 4)
+  calculation_period      String?
+  grace_days              Int       @default(0)
+  is_compound             Boolean   @default(false)
+  max_percentage          Decimal?  @db.Decimal(5, 2)
+  max_amount              Decimal?  @db.Decimal(15, 2)
+  effective_from          DateTime
+  effective_to            DateTime?
+  applies_to_all_concepts Boolean   @default(true)
+  is_active               Boolean   @default(true)
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+  created_by              String?
+
+  condominium          PhCondominium            @relation(fields: [condominium_id], references: [id], onDelete: Cascade)
+  concept_associations PhBillingConfigConcept[]
+
+  @@index([condominium_id])
+  @@index([config_type])
+  @@map("ph_billing_configs")
+}
+
+model PhBillingConfigConcept {
+  id                String   @id @default(uuid())
+  billing_config_id String
+  fee_concept_id    String
+  created_at        DateTime @default(now())
+
+  billing_config PhBillingConfig @relation(fields: [billing_config_id], references: [id], onDelete: Cascade)
+  fee_concept    PhFeeConcept    @relation(fields: [fee_concept_id], references: [id], onDelete: Cascade)
+
+  @@unique([billing_config_id, fee_concept_id])
+  @@index([billing_config_id])
+  @@index([fee_concept_id])
+  @@map("ph_billing_config_concepts")
+}
+
+model PhInsurancePolicy {
+  id                        String   @id @default(uuid())
+  condominium_id            String
+  insurance_third_party_id  String?  // FK al tercero (SUPPLIER) = aseguradora actual
+  policy_number             String
+  insurance_company         String   // nombre de referencia (fallback si no hay tercero)
+  policy_type               String   // todo_riesgo, incendio, terremoto, responsabilidad_civil, otro
+  coverage_amount           Decimal? @db.Decimal(15, 2)
+  premium                   Decimal? @db.Decimal(15, 2)
+  start_date                DateTime
+  end_date                  DateTime
+  renewal_date              DateTime?
+  status                    String   @default("active") // active, expired, cancelled
+  document_url              String?
+  notes                     String?
+  created_by                String?
+  created_at                DateTime @default(now())
+  updated_at                DateTime @updatedAt
+
+  condominium          PhCondominium  @relation(fields: [condominium_id], references: [id], onDelete: Cascade)
+  insurance_third_party ThirdParty?   @relation("InsurancePolicyThirdParty", fields: [insurance_third_party_id], references: [id], onDelete: SetNull)
+  insurers             PhInsurancePolicyInsurer[]
+
+  @@index([condominium_id])
+  @@index([insurance_third_party_id])
+  @@index([status])
+  @@index([end_date])
+  @@map("ph_insurance_policies")
+}
+
+model PhInsurancePolicyInsurer {
+  id             String    @id @default(uuid())
+  policy_id      String
+  third_party_id String
+  role           String    @default("insurer") // insurer, broker, adjuster
+  start_date     DateTime
+  end_date       DateTime?
+  notes          String?
+  created_by     String?
+  created_at     DateTime  @default(now())
+
+  policy      PhInsurancePolicy @relation(fields: [policy_id], references: [id], onDelete: Cascade)
+  third_party ThirdParty        @relation("InsurancePolicyInsurerThirdParty", fields: [third_party_id], references: [id], onDelete: Cascade)
+
+  @@index([policy_id])
+  @@index([third_party_id])
+  @@map("ph_insurance_policy_insurers")
+}
+
+// ─── Planes de mantenimiento ───
+
+model PhMaintenancePlan {
+  id                        String    @id @default(uuid())
+  condominium_id            String
+  unit_id                   String?
+  provider_third_party_id   String?
+  name                      String
+  description               String?
+  category                  String    // ascensores, bombas, tanques, jardines, electrico, plomeria, pintura, impermeabilizacion, fumigacion, otro
+  frequency                 String    // mensual, bimestral, trimestral, semestral, anual, unica
+  estimated_cost            Decimal?  @db.Decimal(15, 2)
+  last_maintenance_date     DateTime?
+  next_maintenance_date     DateTime
+  status                    String    @default("active") // active, paused, completed
+  document_url              String?
+  notes                     String?
+  created_by                String?
+  created_at                DateTime  @default(now())
+  updated_at                DateTime  @updatedAt
+
+  condominium    PhCondominium @relation(fields: [condominium_id], references: [id], onDelete: Cascade)
+  unit           PhUnit?       @relation(fields: [unit_id], references: [id], onDelete: SetNull)
+  provider       ThirdParty?   @relation("MaintenancePlanProvider", fields: [provider_third_party_id], references: [id], onDelete: SetNull)
+  logs           PhMaintenanceLog[]
+
+  @@index([condominium_id])
+  @@index([unit_id])
+  @@index([provider_third_party_id])
+  @@index([status])
+  @@index([next_maintenance_date])
+  @@index([category])
+  @@map("ph_maintenance_plans")
+}
+
+model PhMaintenanceLog {
+  id                        String    @id @default(uuid())
+  plan_id                   String
+  unit_ids                  String[]  @default([])
+  performed_date            DateTime
+  performed_by              String?
+  provider_third_party_id   String?
+  actual_cost               Decimal?  @db.Decimal(15, 2)
+  observations              String?
+  document_url              String?
+  created_by                String?
+  created_at                DateTime  @default(now())
+
+  plan           PhMaintenancePlan @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  provider       ThirdParty?       @relation("MaintenanceLogProvider", fields: [provider_third_party_id], references: [id], onDelete: SetNull)
+
+  @@index([plan_id])
+  @@index([provider_third_party_id])
+  @@index([performed_date])
+  @@map("ph_maintenance_logs")
+}
+
+// ============================================
+// MEDIA (Archivos centralizados por tenant)
+// ============================================
+
+model Media {
+  id            String   @id @default(uuid())
+  original_name String
+  file_name     String
+  mime_type     String
+  size          Int
+  category      String
+  visibility    String   @default("company")
+  uploaded_by   String
+  storage_path  String
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([category])
+  @@index([uploaded_by])
+  @@map("media")
+  }
+// ─── Espacio Documental ───
+
+model PhDocumentCategory {
+  id          String   @id @default(uuid())
+  company_id  String
+  name        String
+  slug        String
+  description String?
+  color       String?
+  icon        String?
+  sort_order  Int      @default(0)
+  is_active   Boolean  @default(true)
+  created_by  String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  documents   PhDocument[]
+
+  @@unique([company_id, slug])
+  @@index([company_id])
+  @@map("ph_document_categories")
+}
+
+model PhDocument {
+  id               String    @id @default(uuid())
+  condominium_id   String
+  name             String
+  description      String?
+  category_id      String?
+  file_url         String?   // URL from media-service (/api/media/{id})
+  external_url     String?   // External link (Google Drive, OneDrive, etc.)
+  file_name        String?   // Original filename
+  file_size        Int?      // File size in bytes
+  mime_type        String?
+  uploaded_by      String?
+  notes            String?
+  status           String    @default("active") // active, archived
+  created_by       String?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  condominium PhCondominium       @relation(fields: [condominium_id], references: [id], onDelete: Cascade)
+  category    PhDocumentCategory?  @relation(fields: [category_id], references: [id], onDelete: SetNull)
+
+  @@index([condominium_id])
+  @@index([category_id])
+  @@index([status])
+  @@map("ph_documents")
+}
+
+// ─── Asambleas ───────────────────────────────────────────────
+
+model PhAssembly {
+  id               String    @id @default(uuid())
+  condominium_id   String
+  title            String
+  description      String?
+  assembly_date    DateTime
+  start_time       String    // "HH:MM"
+  end_time         String?
+  location         String?
+  assembly_type    String    @default("ordinary") // ordinary, extraordinary
+  quorum_required  Float?    // porcentaje mínimo (permite decimales como 38.5)
+  quorum_reached   Boolean   @default(false)
+  qr_code          String?   @unique // UUID token para el QR
+  status           String    @default("scheduled") // scheduled, in_progress, completed, cancelled
+  notes            String?
+  created_by       String?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  condominium PhCondominium        @relation(fields: [condominium_id], references: [id], onDelete: Cascade)
+  attendances PhAssemblyAttendance[]
+  votes       PhAssemblyVote[]
+
+  @@index([condominium_id])
+  @@index([status])
+  @@index([assembly_date])
+  @@map("ph_assemblies")
+}
+
+model PhAssemblyAttendance {
+  id            String    @id @default(uuid())
+  assembly_id   String
+  unit_id       String?
+  tercero_id    String?   // residente (referencia a terceros en master)
+  resident_name String?   // nombre del residente (desnormalizado para reportes)
+  unit_label    String?   // etiqueta de unidad (desnormalizado para reportes)
+  delegate_name String?   // si asiste un delegado/apoderado
+  method        String    @default("manual") // qr, manual
+  checked_in_at DateTime  @default(now())
+  notes         String?
+  created_at    DateTime  @default(now())
+
+  assembly PhAssembly @relation(fields: [assembly_id], references: [id], onDelete: Cascade)
+
+  @@unique([assembly_id, tercero_id])
+  @@index([assembly_id])
+  @@map("ph_assembly_attendances")
+}
+
+model PhAssemblyVote {
+  id          String    @id @default(uuid())
+  assembly_id String
+  title       String
+  description String?
+  vote_type   String    @default("yes_no") // yes_no, multiple_choice
+  options     String?   // JSON array para multiple_choice: ["opcion1","opcion2",...]
+  status      String    @default("pending") // pending, open, closed
+  opened_at   DateTime?
+  closed_at   DateTime?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  assembly PhAssembly             @relation(fields: [assembly_id], references: [id], onDelete: Cascade)
+  results  PhAssemblyVoteResult[]
+
+  @@index([assembly_id])
+  @@map("ph_assembly_votes")
+}
+
+model PhAssemblyVoteResult {
+  id              String   @id @default(uuid())
+  vote_id         String
+  tercero_id      String?
+  unit_id         String?
+  resident_name   String?  // desnormalizado
+  unit_label      String?  // desnormalizado
+  selected_option String   // "yes"/"no"/"abstain" o la opción elegida
+  voted_at        DateTime @default(now())
+
+  vote PhAssemblyVote @relation(fields: [vote_id], references: [id], onDelete: Cascade)
+
+  @@unique([vote_id, tercero_id])
+  @@index([vote_id])
+  @@map("ph_assembly_vote_results")
+}
+
+// ─── PQRS (Peticiones, Quejas, Reclamos, Sugerencias) ───
+
+model PhPqrs {
+  id               String    @id @default(uuid())
+  condominium_id   String
+  unit_id          String?
+  tercero_id       String?
+
+  ticket_number    Int
+  title            String
+  description      String    @db.Text
+  type             String    @default("petition")   // petition, complaint, claim, suggestion
+  priority         String    @default("medium")     // low, medium, high, urgent
+  status           String    @default("open")       // open, in_progress, resolved, closed
+
+  contact_name     String?
+  contact_email    String?
+  contact_phone    String?
+
+  resolved_at      DateTime?
+  closed_at        DateTime?
+
+  created_by       String?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  condominium PhCondominium  @relation(fields: [condominium_id], references: [id], onDelete: Cascade)
+  messages    PhPqrsMessage[]
+
+  @@index([condominium_id])
+  @@index([status])
+  @@index([type])
+  @@index([tercero_id])
+  @@index([created_at])
+  @@map("ph_pqrs")
+}
+
+model PhPqrsMessage {
+  id            String    @id @default(uuid())
+  pqrs_id       String
+  content       String    @db.Text
+  sender_type   String                        // 'admin' | 'resident'
+  sender_id     String?
+  sender_name   String?
+
+  email_sent    Boolean   @default(false)
+  email_sent_at DateTime?
+  email_to      String?
+
+  created_at    DateTime  @default(now())
+
+  pqrs PhPqrs @relation(fields: [pqrs_id], references: [id], onDelete: Cascade)
+
+  @@index([pqrs_id])
+  @@map("ph_pqrs_messages")
+}
+
+model PhComunicado {
+  id               String    @id @default(uuid())
+  condominium_id   String
+  title            String
+  body             String    @db.Text
+  target_roles     Json      // ["owner", "tenant"]
+  status           String    @default("draft") // draft | sent
+  sent_at          DateTime?
+  total_recipients Int       @default(0)
+  total_sent       Int       @default(0)
+  total_failed     Int       @default(0)
+  total_no_email   Int       @default(0)
+  created_by       String?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  condominium PhCondominium       @relation(fields: [condominium_id], references: [id], onDelete: Cascade)
+  recipients  PhComunicadoRecipient[]
+
+  @@index([condominium_id])
+  @@index([status])
+  @@index([created_at])
+  @@map("ph_comunicados")
+}
+
+model PhComunicadoRecipient {
+  id            String    @id @default(uuid())
+  comunicado_id String
+  tercero_id    String
+  email         String?
+  email_sent    Boolean   @default(false)
+  email_error   String?
+  created_at    DateTime  @default(now())
+
+  comunicado PhComunicado @relation(fields: [comunicado_id], references: [id], onDelete: Cascade)
+
+  @@index([comunicado_id])
+  @@map("ph_comunicado_recipients")
+}
+
+// ─── Portería ────────────────────────────────────────────────────────────────
+
+model PhAccessLog {
+  id                  String    @id @default(uuid())
+  condominium_id      String
+  visit_type          String    // visitor | provider | resident | delivery
+  visitor_name        String
+  visitor_doc         String?
+  visitor_company     String?
+  destination_unit_id String?
+  purpose             String?
+  entry_at            DateTime  @default(now())
+  exit_at             DateTime?
+  notes               String?
+  created_by          String
+  created_at          DateTime  @default(now())
+
+  condominium      PhCondominium @relation(fields: [condominium_id], references: [id], onDelete: Cascade)
+  destination_unit PhUnit?       @relation(fields: [destination_unit_id], references: [id], onDelete: SetNull)
+
+  @@index([condominium_id])
+  @@index([entry_at])
+  @@index([visit_type])
+  @@map("ph_access_logs")
+}
+
+model PhPackage {
+  id                String    @id @default(uuid())
+  condominium_id    String
+  unit_id           String
+  tercero_id        String?
+  description       String
+  carrier           String?
+  tracking_number   String?
+  status            String    @default("pending") // pending | notified | delivered
+  received_at       DateTime  @default(now())
+  delivered_at      DateTime?
+  notification_sent Boolean   @default(false)
+  notes             String?
+  created_by        String
+  created_at        DateTime  @default(now())
+
+  condominium PhCondominium @relation(fields: [condominium_id], references: [id], onDelete: Cascade)
+  unit        PhUnit        @relation(fields: [unit_id], references: [id], onDelete: Cascade)
+
+  @@index([condominium_id])
+  @@index([unit_id])
+  @@index([status])
+  @@map("ph_packages")
+}
+
+model PhMinutaEntry {
+  id             String   @id @default(uuid())
+  condominium_id String
+  entry_type     String   // novedad | observacion | incidente | mantenimiento
+  title          String
+  body           String   @db.Text
+  shift          String?  // mañana | tarde | noche
+  created_by     String
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  condominium PhCondominium @relation(fields: [condominium_id], references: [id], onDelete: Cascade)
+
+  @@index([condominium_id])
+  @@index([created_at])
+  @@map("ph_minuta_entries")
+}

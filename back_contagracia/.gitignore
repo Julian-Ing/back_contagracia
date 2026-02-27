@@ -1,0 +1,120 @@
+# ==================================
+# Dependencies - Monorepo & Servicios
+# ==================================
+# Root node_modules
+/node_modules/
+.history/**
+pnpm-lock.yaml
+# Node modules de cada microservicio
+**/node_modules/
+auth-service/node_modules/
+admin-service/node_modules/
+company-service/node_modules/
+accounting-service/node_modules/
+crm-service/node_modules/
+electronic-documents-service/node_modules/
+hr-service/node_modules/
+integrations-service/node_modules/
+inventory-service/node_modules/
+invoicing-service/node_modules/
+notification-service/node_modules/
+purchase-service/node_modules/
+reports-service/node_modules/
+sales-service/node_modules/
+tax-service/node_modules/
+contagracia-shared-modules/node_modules/
+
+# pnpm store
+.pnpm-store/
+
+# ==================================
+# Build outputs
+# ==================================
+**/dist/
+build/
+*.js.map
+
+# ==================================
+# Environment files
+# ==================================
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+!.env.example
+!**/.env.example
+
+# ==================================
+# IDE & Editor
+# ==================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ==================================
+# Logs
+# ==================================
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ==================================
+# Testing
+# ==================================
+coverage/
+.nyc_output/
+
+# ==================================
+# Prisma
+# ==================================
+**/node_modules/.prisma/
+
+# ==================================
+# Temporary files
+# ==================================
+tmp/
+temp/
+*.tmp
+*.temp
+
+# ==================================
+# OS files
+# ==================================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.Spotlight-V100
+.Trashes
+
+# ==================================
+# Lock files (solo mantener pnpm-lock.yaml del root)
+# ==================================
+package-lock.json
+**/package-lock.json
+yarn.lock
+**/yarn.lock
+# Mantener pnpm-lock.yaml de cada servicio si existe
+# !**/pnpm-lock.yaml
+
+# ==================================
+# Local workspace config (no compartir entre devs)
+# ==================================
+pnpm-workspace.yaml
+package.json
+
+# ==================================
+# Certificates & secrets
+# ==================================
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/

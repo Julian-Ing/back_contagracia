@@ -1,0 +1,1211 @@
+// This is your Prisma schema file for MASTER database
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@prisma/client-master"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_MASTER_URL")
+}
+
+// ============================================
+// USERS & AUTHENTICATION
+// ============================================
+
+model User {
+  id            String  @id @default(uuid())
+  email         String  @unique
+  password_hash String
+  full_name     String?
+  phone         String?
+  avatar_url    String?
+  is_active     Boolean @default(true)
+
+  // Email verification
+  email_verified Boolean @default(false)
+
+  // Login tracking
+  last_login_at DateTime?
+  last_login_ip String?
+
+  // Password management
+  password_changed_at  DateTime?
+  must_change_password Boolean   @default(false)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations (solo para admins del sistema)
+  refresh_tokens      RefreshToken[]
+  sessions            Session[]
+  email_verifications EmailVerification[]
+  password_resets     PasswordReset[]
+  blog_posts          BlogPost[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  user_id    String
+  token      String   @unique
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model Session {
+  id            String   @id @default(uuid())
+  user_id       String?  // Null para usuarios de empresa (TenantUser)
+  session_id    String   @unique
+  refresh_token String?  @unique
+  ip_address    String?
+  user_agent    String?
+  device_info   Json?
+  metadata      Json?    // Para guardar tenant_user_id, company_id en sesiones de empresa
+  is_active     Boolean  @default(true)
+  last_activity DateTime @default(now())
+  expires_at    DateTime
+  created_at    DateTime @default(now())
+
+  // Relations (opcional para sesiones de TenantUser)
+  user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([session_id])
+  @@index([is_active, expires_at])
+  @@map("sessions")
+}
+
+model EmailVerification {
+  id         String   @id @default(uuid())
+  user_id    String? // Null si es verificación pre-registro
+  email      String // Email a verificar
+  token      String   @unique
+  code       String? // Código de 6 dígitos para verificación en formulario
+  expires_at DateTime
+  verified   Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  // Relations
+  user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([code])
+  @@map("email_verifications")
+}
+
+model PasswordReset {
+  id         String   @id @default(uuid())
+  user_id    String?  // Null para usuarios de empresa (TenantUser)
+  email      String   // Email del usuario (para lookup sin FK)
+  metadata   Json?    // Para guardar tenant_user_id, company_id en resets de empresa
+  token      String   @unique
+  expires_at DateTime
+  used       Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  // Relations (opcional para TenantUser)
+  user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@map("password_resets")
+}
+
+// ============================================
+// MODULES & PERMISSIONS (Catálogo Global)
+// ============================================
+
+// Módulos del sistema (catálogo global)
+model Module {
+  id          String   @id @default(uuid())
+  module_key  String   @unique // "invoicing", "inventory", "hr", etc.
+  module_name String // "Facturación", "Inventario", "Nómina"
+  description String?
+  icon        String?           // Icono para UI
+  group       String   @default("Otros") // "General", "Operaciones", "Finanzas", "POS", "Recursos Humanos", "Otros"
+  sort_order  Int      @default(0)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  // Relations
+  actions      SystemAction[]
+  plan_modules PlanModule[]
+  dependencies ModuleDependency[] @relation("ModuleDependencies")
+  dependents   ModuleDependency[] @relation("ModuleDependents")
+
+  @@map("modules")
+}
+
+// Dependencias entre módulos (M:N)
+model ModuleDependency {
+  id            String   @id @default(uuid())
+  module_id     String   // El módulo que TIENE la dependencia
+  depends_on_id String   // El módulo del que DEPENDE
+  created_at    DateTime @default(now())
+
+  module     Module @relation("ModuleDependencies", fields: [module_id], references: [id], onDelete: Cascade)
+  depends_on Module @relation("ModuleDependents", fields: [depends_on_id], references: [id], onDelete: Cascade)
+
+  @@unique([module_id, depends_on_id])
+  @@index([module_id])
+  @@index([depends_on_id])
+  @@map("module_dependencies")
+}
+
+// Acciones/Permisos granulares por módulo (catálogo global)
+model SystemAction {
+  id             String    @id @default(uuid())
+  module_id      String
+  action_key     String    @unique // ej: "invoices.create"
+  action_name    String // ej: "Crear Factura"
+  description    String?
+  is_active      Boolean   @default(true)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  // Relations
+  module Module @relation(fields: [module_id], references: [id], onDelete: Cascade)
+
+  @@index([module_id])
+  @@index([action_key])
+  @@map("system_actions")
+}
+
+// ============================================
+// COMPANIES & MULTI-TENANCY
+// ============================================
+
+model Company {
+  id           String  @id @default(uuid())
+  company_name String  // Copia sync — admin panel, login response, header
+  nit          String  @unique // Login routing (auth-service busca por NIT)
+  email        String? // Copia sync — admin panel search
+  logo_url     String? // Copia sync — login response, header (evita latencia extra en login)
+
+  // Multi-tenancy
+  tenant_id   String @unique // Identificador único del tenant
+  db_host     String @default("localhost")
+  db_port     Int    @default(5432)
+  db_name     String @unique // ej: "tenant_empresa_abc123"
+  db_user     String @default("postgres")
+  db_password String // Contraseña encriptada o usar secreto
+
+  // Usuarios adicionales (comprados aparte del plan)
+  user_plus Int @default(0)
+
+  // Status
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  subscriptions        Subscription[]
+  category_assignments CompanyCategoryAssignment[]
+  notifications        CompanyNotification[]
+
+  @@map("companies")
+}
+
+// ============================================
+// PARAMETRIC TABLES (DIAN / CATALOGS)
+// ============================================
+
+// Geolocalización
+model Country {
+  id         String   @id @default(uuid())
+  code       String // "CO"
+  name       String // "Colombia"
+  phone_code String? // "+57"
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  departments Department[]
+
+  @@map("countries")
+}
+
+model Department {
+  id         String   @id @default(uuid())
+  country_id String
+  code       String   @unique // "05", "08", "11" (código DANE)
+  name       String // "Antioquia", "Bogotá D.C."
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  country        Country        @relation(fields: [country_id], references: [id])
+  municipalities Municipality[]
+
+  @@index([country_id])
+  @@map("departments")
+}
+
+model Municipality {
+  id            String   @id @default(uuid())
+  department_id String
+  code          String   @unique // código DANE completo
+  name          String // "Medellín", "Bogotá"
+  dian_code     String? // código facturador DIAN
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+
+  department Department @relation(fields: [department_id], references: [id])
+
+  @@index([department_id])
+  @@map("municipalities")
+}
+
+// Tipos DIAN (Facturación Electrónica)
+model TypeDocumentIdentification {
+  id          String   @id @default(uuid())
+  code        String   @unique // "13" (NIT), "31" (NIT persona natural), "11" (RC), "12" (TI), "21" (Tarjeta de extranjería), "22" (Cédula de extranjería), "41" (Pasaporte), "42" (Documento de identificación extranjero)
+  name        String // "NIT", "Cédula de Ciudadanía", "Pasaporte"
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  @@map("type_document_identifications")
+}
+
+model TypeOrganization {
+  id          String   @id @default(uuid())
+  code        String   @unique // "1" (Persona jurídica), "2" (Persona natural)
+  name        String // "Persona Jurídica", "Persona Natural"
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  @@map("type_organizations")
+}
+
+model TypeRegime {
+  id          String   @id @default(uuid())
+  code        String   @unique // "48" (Responsable IVA), "49" (No responsable IVA)
+  name        String // "Responsable de IVA", "No Responsable de IVA", "Régimen Simple"
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  @@map("type_regimes")
+}
+
+model TypeLiability {
+  id          String   @id @default(uuid())
+  code        String   @unique // "O-13" (Gran contribuyente), "O-15" (Autoretenedor), "O-23" (Agente de retención IVA), "R-99-PN" (Régimen simple)
+  name        String // "Gran Contribuyente", "Autoretenedor", "No Responsable de IVA"
+  description String?
+  category    String? // Para agrupar responsabilidades
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  @@map("type_liabilities")
+}
+
+// Catálogos Complementarios
+model Bank {
+  id         String   @id @default(uuid())
+  code       String   @unique // código bancario
+  name       String // "Bancolombia", "Banco de Bogotá"
+  country    String   @default("CO")
+  swift_code String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  @@map("banks")
+}
+
+model PaymentMethod {
+  id          String   @id @default(uuid())
+  code        String   @unique // "10" (Efectivo), "20" (Cheque), "30" (Transferencia), "48" (Tarjeta crédito), "49" (Tarjeta débito)
+  name        String // "Efectivo", "Transferencia Bancaria", "Tarjeta de Crédito"
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  companyPaymentMethods CompanyPaymentMethod[]
+
+  @@map("payment_methods")
+}
+
+// Métodos de pago por defecto que se replican a cada tenant nuevo
+model CompanyPaymentMethod {
+  id                  String   @id @default(uuid())
+  payment_method_code String   // FK al código de PaymentMethod
+  consecutive         String?  @unique
+  name                String   // Nombre personalizado para el tenant
+  description         String?
+  is_active           Boolean  @default(true)
+  created_at          DateTime @default(now())
+
+  payment_method PaymentMethod @relation(fields: [payment_method_code], references: [code])
+
+  @@map("company_payment_methods")
+}
+
+model ProductUnit {
+  id          String   @id @default(uuid())
+  name        String // "Unidad", "Kilogramo", "Litro"
+  symbol      String? // "und", "kg", "lt", "m"
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  @@map("product_units")
+}
+
+model Tax {
+  id          String   @id @default(uuid())
+  code        String   @unique // "01" (IVA 19%), "02" (IVA 5%), "03" (IVA 0%), "04" (Excluido), "05" (Exento)
+  name        String // "IVA 19%", "IVA 5%", "Excluido"
+  rate        Decimal  @db.Decimal(8, 4) // 19.00, 5.00, 0.00
+  tax_type_id Int      @default(1) // Por defecto IVA (id=1)
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  tax_type TaxType @relation(fields: [tax_type_id], references: [id])
+
+  @@map("taxes")
+}
+
+model TaxType {
+  id          Int      @id // 1, 4, 5, 6, etc. (IDs fijos DIAN)
+  code        String   @unique // "01" (IVA), "04" (INC), "05" (ReteIVA), etc.
+  name        String // "IVA", "INC", "ReteIVA"
+  description String? // "Impuesto sobre las Ventas"
+  is_tax      Boolean  @default(true) // true = impuesto, false = retención
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+
+  taxes Tax[]
+
+  @@map("tax_types")
+}
+
+// Tipos de consecutivos (catálogo maestro)
+model ConsecutiveType {
+  type            String  @id // invoice, purchase, journal_entry, etc.
+  default_prefix  String  // FV, CO, JE, etc.
+  description     String  // Factura de Venta, Compra, Asiento Contable, etc.
+  table_name      String? // Nombre de la tabla Prisma: BankMovement, JournalEntry
+  field_name      String  @default("consecutive") // Campo destino
+  condition_field String? // Campo para condición (ej: type_key)
+  condition_value String? // Valor de la condición (ej: sale_invoice)
+
+  @@map("consecutive_types")
+}
+
+// Tipos de movimiento de inventario (catálogo maestro)
+model ProductMovementType {
+  key  String @id // sale, purchase, transfer, adjustment, etc.
+  name String // Venta, Compra, Transferencia, Ajuste, etc.
+
+  @@map("product_movement_types")
+}
+
+model ArlRisk {
+  id         String   @id @default(uuid())
+  code       String   @unique // "I", "II", "III", "IV", "V"
+  name       String // "Riesgo I - Bajo", etc.
+  rate       Decimal  @db.Decimal(8, 4) // 0.522, 1.044, 2.436, 4.350, 6.960
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  @@map("arl_risks")
+}
+
+model TypeWorker {
+  id         String   @id @default(uuid())
+  code       String   @unique // "01", "02", "04", etc.
+  name       String // "Dependiente", "Servicio domestico", etc.
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  @@map("type_workers")
+}
+
+model SubTypeWorker {
+  id         String   @id @default(uuid())
+  code       String   @unique // "00", "01", "02", etc.
+  name       String // "No Aplica", "Dependiente pensionado...", etc.
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  @@map("sub_type_workers")
+}
+
+model TypeContract {
+  id         String   @id @default(uuid())
+  code       String   @unique // "1", "2", "3", etc.
+  name       String // "Término Fijo", "Término Indefinido", etc.
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  @@map("type_contracts")
+}
+
+model Event {
+  id         String   @id @default(uuid())
+  code       String   @unique // "030", "031", "032", "02", "04", etc.
+  name       String // "Acuse de recibo...", "Reclamo...", etc.
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  @@map("events")
+}
+
+model TypeDocument {
+  id             String   @id @default(uuid())
+  code           String   @unique // "01", "02", "91", "92", etc.
+  name           String // "Factura de Venta Nacional", "Nota Crédito", etc.
+  cufe_algorithm String? // "CUFE-SHA384", "CUDE-SHA384", "CUNE-SHA384", "CUDS-SHA384"
+  prefix         String? // "fv", "nc", "nd", "ni", "na", etc.
+  display_order  Int?
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+
+  @@map("type_documents")
+}
+
+model TypeOperation {
+  id         String   @id @default(uuid())
+  code       String   @unique // "01".."16", "20".."35", "60", "601", "602"
+  name       String // "Estándar", "Exportación", "AIU", etc.
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  @@map("type_operations")
+}
+
+model TypeRejection {
+  id         String   @id @default(uuid())
+  code       String   @unique // "01", "02", "03", "04"
+  name       String // "Documento con inconsistencias", etc.
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  @@map("type_rejections")
+}
+
+model TypePayrollAdjustNote {
+  id         String   @id @default(uuid())
+  code       String   @unique // "1", "2"
+  name       String // "Reemplazar", "Eliminar"
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
+  @@map("type_payroll_adjust_notes")
+}
+
+model WorkerSubtypeRule {
+  id                       String   @id @default(uuid())
+  sub_type_worker_id       String   @unique
+  health_employee_rate     Decimal? @db.Decimal(8, 4)
+  health_employer_rate     Decimal? @db.Decimal(8, 4)
+  pension_employee_rate    Decimal? @db.Decimal(8, 4)
+  pension_employer_rate    Decimal? @db.Decimal(8, 4)
+  health_employee_pays     Boolean  @default(true)
+  pension_employee_pays    Boolean  @default(true)
+  ccf_applies              Boolean  @default(true)
+  icbf_applies             Boolean  @default(true)
+  sena_applies             Boolean  @default(true)
+  arl_applies              Boolean  @default(true)
+  fsp_applies              Boolean  @default(true)
+  fsp_special_rate         Decimal? @db.Decimal(8, 4)
+  ibc_min_smmlv_percentage Decimal? @db.Decimal(8, 4)
+  legal_notes              String?
+  ui_display_name          String?
+  ui_impacts               Json?
+  ui_color                 String?  @default("amber")
+  is_active                Boolean  @default(true)
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
+
+  @@map("worker_subtype_rules")
+}
+
+model TaxObligationType {
+  id                            String   @id @default(uuid())
+  code                          String   @unique
+  name                          String
+  description                   String?
+  category                      String   @default("nacional")
+  periodicity                   String // "anual", "bimestral", "cuatrimestral", "mensual", "trimestral"
+  nit_digit_type                String   @default("last_1") // "last_1", "last_2", "independent"
+  applies_to_gran_contribuyente Boolean  @default(false)
+  applies_to_persona_juridica   Boolean  @default(true)
+  applies_to_persona_natural    Boolean  @default(true)
+  applies_to_rst                Boolean  @default(false)
+  has_multiple_installments     Boolean  @default(false)
+  installment_count             Int      @default(1)
+  is_active                     Boolean  @default(true)
+  display_order                 Int      @default(0)
+  created_at                    DateTime @default(now())
+  updated_at                    DateTime @updatedAt
+
+  // Relations
+  calendar_dates TaxCalendarDate[]
+
+  @@map("tax_obligation_types")
+}
+
+// Fechas del calendario tributario por año
+model TaxCalendarDate {
+  id                       String   @id @default(uuid())
+  year                     Int                    // 2025, 2026, etc.
+  tax_obligation_type_id   String
+  period_name              String                 // "anual", "bimestral", "mensual"
+  period_start_month       Int?                   // Mes inicio (1-12)
+  period_end_month         Int?                   // Mes fin (1-12)
+  installment_number       Int      @default(1)   // Cuota (1, 2, 3 para Renta GC)
+  installment_description  String?                // "Primera cuota", "Bimestre ene-feb"
+  nit_last_digits          String?                // "0"-"9" o null si no aplica por NIT
+  due_date                 DateTime               // Fecha de vencimiento
+  due_month_name           String                 // "enero", "febrero", etc.
+  due_day                  Int                    // Día del vencimiento (1-31)
+  is_declaration           Boolean  @default(false)
+  is_payment               Boolean  @default(true)
+  source_url               String?                // URL del PDF origen
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
+
+  tax_obligation_type TaxObligationType @relation(fields: [tax_obligation_type_id], references: [id], onDelete: Cascade)
+
+  @@index([year, tax_obligation_type_id])
+  @@index([due_date])
+  @@index([nit_last_digits])
+  @@map("tax_calendar_dates")
+}
+
+// Log de sincronizaciones del calendario
+model TaxCalendarSyncLog {
+  id                 String   @id @default(uuid())
+  year               Int
+  source_url         String?                // URL del PDF descargado
+  source_file_name   String?                // Nombre del archivo
+  status             String                 // "success", "partial", "failed"
+  records_created    Int      @default(0)
+  records_updated    Int      @default(0)
+  sync_duration_ms   Int?
+  error_message      String?  @db.Text
+  created_at         DateTime @default(now())
+
+  @@map("tax_calendar_sync_logs")
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+  COST
+  PRODUCTION_COST
+  DEBTOR_ACCOUNTS
+  CREDITOR_ACCOUNTS
+}
+
+enum TransactionDirection {
+  IN // Ingreso
+  OUT // Egreso
+}
+
+enum PayrollConceptType {
+  ACCRUED      // Devengados
+  DEDUCTION    // Deducciones
+  PROVISION    // Provisiones
+  PARAFISCAL   // Parafiscales
+}
+
+model ChartOfAccount {
+  code        String      @id
+  name        String
+  type        AccountType
+  parent_code String?
+  is_active   Boolean     @default(true)
+  created_at  DateTime    @default(now())
+  updated_at  DateTime    @updatedAt
+
+  parent   ChartOfAccount?  @relation("AccountHierarchy", fields: [parent_code], references: [code])
+  children ChartOfAccount[] @relation("AccountHierarchy")
+
+  accounting_configs AccountingConfig[] @relation("AccountConfig")
+  bank_adjustment_types     BankAdjustmentType[]
+
+  // Payroll concepts
+  payroll_concepts_debit       PayrollConcept[] @relation("PayrollConceptDebit")
+  payroll_concepts_admin_debit PayrollConcept[] @relation("PayrollConceptAdminDebit")
+  payroll_concepts_credit      PayrollConcept[] @relation("PayrollConceptCredit")
+
+  @@index([type])
+  @@index([parent_code])
+  @@map("chart_of_accounts")
+}
+
+model BankAdjustmentType {
+  id           String               @id @default(uuid())
+  name         String
+  direction    TransactionDirection
+  account_code String?
+  is_active    Boolean              @default(true)
+  created_at   DateTime             @default(now())
+
+  account ChartOfAccount? @relation(fields: [account_code], references: [code])
+
+  @@index([direction])
+  @@map("bank_adjustment_types")
+}
+
+model AccountingConfig {
+  key          String   @id
+  description  String
+  account_code String?
+  default      String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  account ChartOfAccount? @relation("AccountConfig", fields: [account_code], references: [code])
+
+  @@map("accounting_configs")
+}
+
+model PayrollConcept {
+  key                            String              @id
+  name                           String
+  debit_account_code             String?
+  administrative_debit_account_code String?
+  credit_account_code            String?
+  default_value                  Decimal?            @db.Decimal(18, 4)
+  default_percentage             Decimal?            @db.Decimal(18, 4)
+  is_percentage                  Boolean             @default(false)
+  is_array                       Boolean             @default(false)
+  is_legal                       Boolean             @default(false)
+  concept_type                   PayrollConceptType  @default(ACCRUED)
+  created_at                     DateTime            @default(now())
+  updated_at                     DateTime            @updatedAt
+
+  debit_account              ChartOfAccount? @relation("PayrollConceptDebit", fields: [debit_account_code], references: [code])
+  administrative_debit_account ChartOfAccount? @relation("PayrollConceptAdminDebit", fields: [administrative_debit_account_code], references: [code])
+  credit_account             ChartOfAccount? @relation("PayrollConceptCredit", fields: [credit_account_code], references: [code])
+
+  @@map("payroll_concepts")
+}
+
+model JournalEntryType {
+  key         String @id
+  description String
+  color       String @default("#6B7280")
+
+  @@map("journal_entry_types")
+}
+
+model BankMovementType {
+  key         String @id
+  description String
+
+  @@map("bank_movement_types")
+}
+
+model ArApSource {
+  key         String @id
+  description String
+
+  @@map("ar_ap_sources")
+}
+
+// ============================================
+// PLANS & SUBSCRIPTIONS
+// ============================================
+
+model Plan {
+  id          String  @id @default(uuid())
+  name        String  @unique // Trial, Básico, Profesional, Empresarial
+  description String?
+  price       Decimal @db.Decimal(10, 4)
+  currency    String  @default("COP")
+
+  // Límites del plan
+  max_users     Int  @default(1)
+  max_invoices  Int? // null = ilimitado
+  max_products  Int?
+  max_employees Int? // Para nómina
+
+  // Trial/Free plan
+  is_trial   Boolean @default(false)
+  trial_days Int     @default(14)
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  subscriptions Subscription[]
+  plan_modules  PlanModule[] // Módulos incluidos en el plan
+
+  @@map("plans")
+}
+
+// Módulos disponibles en cada plan
+// Si un plan tiene un módulo, tiene TODAS las acciones de ese módulo
+model PlanModule {
+  id         String   @id @default(uuid())
+  plan_id    String
+  module_id  String
+  created_at DateTime @default(now())
+
+  // Relations
+  plan   Plan   @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  module Module @relation(fields: [module_id], references: [id], onDelete: Cascade)
+
+  @@unique([plan_id, module_id])
+  @@index([plan_id])
+  @@map("plan_modules")
+}
+
+model Subscription {
+  id         String @id @default(uuid())
+  company_id String
+  plan_id    String
+
+  starts_at     DateTime           @default(now())
+  ends_at       DateTime?
+  auto_renew    Boolean            @default(true)
+  billing_cycle String             @default("MONTHLY") // MONTHLY, YEARLY
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  plan    Plan    @relation(fields: [plan_id], references: [id])
+
+  @@index([company_id])
+  @@map("subscriptions")
+}
+
+// ============================================
+// CMS - Pages & Sections
+// ============================================
+
+model Page {
+  id               String    @id @default(uuid())
+  slug             String    @unique
+  title            String
+  description      String?
+  page_type        String    @default("static") // landing, static, blog_list, legal, custom
+  layout           String?
+  show_in_header   Boolean   @default(false)
+  show_in_footer   Boolean   @default(false)
+  header_order     Int?
+  footer_order     Int?
+  header_label     String?
+  footer_label     String?
+  is_active        Boolean   @default(true)
+  is_published     Boolean   @default(false)
+  meta_title       String?
+  meta_description String?
+  og_title         String?
+  og_description   String?
+  og_image         String?
+  settings         Json?
+  published_at     DateTime?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  sections SiteSection[]
+
+  @@index([slug])
+  @@index([page_type])
+  @@index([is_published, is_active])
+  @@map("pages")
+}
+
+model SiteSection {
+  id            String  @id @default(uuid())
+  section_key   String
+  section_type  String // hero, feature_grid, benefits, pricing, blog_section, cta, container
+  title         String?
+  subtitle      String?
+  content       Json?
+  page_id       String
+  is_active     Boolean @default(true)
+  display_order Int     @default(0)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  page Page @relation(fields: [page_id], references: [id], onDelete: Cascade)
+
+  @@index([page_id, display_order])
+  @@index([section_type])
+  @@map("site_sections")
+}
+
+// ============================================
+// COMPANY CATEGORIES
+// ============================================
+
+model CompanyCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  color       String   @default("#6366f1")
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  assignments CompanyCategoryAssignment[]
+
+  @@map("company_categories")
+}
+
+model CompanyCategoryAssignment {
+  id          String   @id @default(uuid())
+  company_id  String
+  category_id String
+  assigned_at DateTime @default(now())
+
+  company  Company         @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  category CompanyCategory @relation(fields: [category_id], references: [id], onDelete: Cascade)
+
+  @@unique([company_id, category_id])
+  @@index([company_id])
+  @@index([category_id])
+  @@map("company_category_assignments")
+}
+
+// ============================================
+// INTEGRATIONS (Email, Payments, etc.)
+// ============================================
+
+model Integration {
+  id          String   @id @default(uuid())
+  code        String   @unique // "sendgrid", "smtp", "aws_ses", "mailgun"
+  name        String // "SendGrid", "SMTP", "AWS SES", "Mailgun"
+  type        String // "email", "payment", "storage", etc.
+  description String?
+  is_active   Boolean  @default(false) // Solo una por tipo debería estar activa
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  // Relations
+  keys IntegrationKey[]
+
+  @@index([type, is_active])
+  @@map("integrations")
+}
+
+model IntegrationKey {
+  id             String   @id @default(uuid())
+  integration_id String
+  key_name       String // "api_key", "host", "port", "from_email", etc.
+  key_value      String // Valor (encriptar en producción si es sensible)
+  is_secret      Boolean  @default(false) // true = no mostrar en UI
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  // Relations
+  integration Integration @relation(fields: [integration_id], references: [id], onDelete: Cascade)
+
+  @@unique([integration_id, key_name])
+  @@index([integration_id])
+  @@map("integration_keys")
+}
+
+// ============================================
+// BLOG
+// ============================================
+
+model BlogPost {
+  id             String    @id @default(uuid())
+  title          String
+  slug           String    @unique
+  content        String?   @db.Text
+  excerpt        String?   @db.Text
+  featured_image String?
+  author_id      String?
+  published_at   DateTime?
+  is_active      Boolean   @default(true)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  author           User?                @relation(fields: [author_id], references: [id], onDelete: SetNull)
+  post_tags        BlogPostTag[]
+  comments         BlogComment[]
+  views            BlogView[]
+  analytics        BlogAnalytics?
+  reactions        BlogReaction[]
+  bookmarks        BlogBookmark[]
+  reading_sessions BlogReadingSession[]
+
+  @@index([slug])
+  @@index([published_at])
+  @@index([author_id])
+  @@map("blog_posts")
+}
+
+model BlogTag {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  color       String   @default("#8B5CF6")
+  icon        String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  post_tags     BlogPostTag[]
+  tag_analytics BlogTagAnalytics[]
+
+  @@map("blog_tags")
+}
+
+model BlogPostTag {
+  id         String   @id @default(uuid())
+  post_id    String
+  tag_id     String
+  created_at DateTime @default(now())
+
+  post BlogPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  tag  BlogTag  @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@unique([post_id, tag_id])
+  @@index([post_id])
+  @@index([tag_id])
+  @@map("blog_post_tags")
+}
+
+model BlogComment {
+  id           String   @id @default(uuid())
+  post_id      String
+  parent_id    String?
+  author_name  String
+  author_email String
+  content      String   @db.Text
+  rating       Int?
+  is_approved  Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  post    BlogPost      @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  parent  BlogComment?  @relation("CommentReplies", fields: [parent_id], references: [id], onDelete: Cascade)
+  replies BlogComment[] @relation("CommentReplies")
+
+  @@index([post_id])
+  @@index([parent_id])
+  @@map("blog_comments")
+}
+
+model BlogView {
+  id         String   @id @default(uuid())
+  post_id    String
+  visitor_id String
+  viewed_at  DateTime @default(now())
+
+  post BlogPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@index([post_id])
+  @@index([visitor_id])
+  @@map("blog_views")
+}
+
+model BlogAnalytics {
+  id             String   @id @default(uuid())
+  post_id        String   @unique
+  views_count    Int      @default(0)
+  unique_views   Int      @default(0)
+  comments_count Int      @default(0)
+  average_rating Decimal  @default(0) @db.Decimal(3, 2)
+  total_ratings  Int      @default(0)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  post BlogPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@map("blog_analytics")
+}
+
+model BlogReaction {
+  id            String   @id @default(uuid())
+  post_id       String
+  visitor_id    String
+  reaction_type String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  post BlogPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@unique([post_id, visitor_id])
+  @@index([post_id])
+  @@map("blog_reactions")
+}
+
+model BlogBookmark {
+  id         String   @id @default(uuid())
+  post_id    String
+  visitor_id String
+  created_at DateTime @default(now())
+
+  post BlogPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@unique([post_id, visitor_id])
+  @@index([post_id])
+  @@map("blog_bookmarks")
+}
+
+model BlogReadingSession {
+  id                   String    @id @default(uuid())
+  post_id              String
+  visitor_id           String
+  reading_time_seconds Int       @default(0)
+  scroll_percentage    Decimal   @default(0) @db.Decimal(5, 2)
+  completed_reading    Boolean   @default(false)
+  session_start        DateTime  @default(now())
+  session_end          DateTime?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  post BlogPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@index([post_id])
+  @@index([visitor_id])
+  @@map("blog_reading_sessions")
+}
+
+model BlogTagAnalytics {
+  id         String   @id @default(uuid())
+  tag_id     String
+  views      Int      @default(0)
+  clicks     Int      @default(0)
+  date       DateTime @default(now()) @db.Date
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  tag BlogTag @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@unique([tag_id, date])
+  @@index([tag_id])
+  @@index([date])
+  @@map("blog_tag_analytics")
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+model BroadcastNotification {
+  id          String   @id @default(uuid())
+  title       String
+  message     String
+  type        String
+  action_url  String?
+  sent_to_all Boolean  @default(false)
+  sent_count  Int      @default(0)
+  sent_by     String?
+  created_at  DateTime @default(now())
+
+  notifications CompanyNotification[]
+
+  @@index([type])
+  @@index([created_at])
+  @@map("broadcast_notifications")
+}
+
+model CompanyNotification {
+  id              String    @id @default(uuid())
+  company_id      String
+  broadcast_id    String?
+  source          String    @default("admin")
+  type            String
+  title           String
+  message         String
+  action_url      String?
+  exclude_user_id String?   /// Si se establece, este usuario NO ve la notificación (evita auto-notificaciones)
+  is_read         Boolean   @default(false)
+  read_at         DateTime?
+  created_at      DateTime  @default(now())
+
+  company   Company                @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  broadcast BroadcastNotification? @relation(fields: [broadcast_id], references: [id], onDelete: SetNull)
+
+  @@index([company_id])
+  @@index([company_id, is_read])
+  @@index([broadcast_id])
+  @@index([created_at])
+  @@index([exclude_user_id])
+  @@map("company_notifications")
+}
+
+// ============================================
+// AI CONFIGURATION
+// ============================================
+
+model AIConfiguration {
+  id                    String   @id @default(uuid())
+  company_id            String   @unique
+  active_provider       String   @default("gemini") // gemini, openai, anthropic
+  gemini_model          String   @default("gemini-2.5-flash")
+  openai_model          String   @default("gpt-4o")
+  anthropic_model       String   @default("claude-sonnet-4-5")
+  assistant_name        String   @default("Asistente Contagracia")
+  assistant_role        String   @default("Asistente contable especializado")
+  greeting              String   @default("¡Hola! Soy tu asistente contable. ¿En qué puedo ayudarte?")
+  avatar_emoji          String   @default("🤖")
+  tone                  String   @default("professional") // professional, friendly, casual, formal
+  detail_level          String   @default("balanced") // concise, balanced, detailed
+  use_emojis            Boolean  @default(true)
+  proactive_suggestions Boolean  @default(true)
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  @@map("ai_configurations")
+}
+
+// ============================================
+// SITE SETTINGS (global key-value config)
+// ============================================
+
+model SiteSetting {
+  key         String   @id
+  value       String?  @db.Text
+  description String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("site_settings")
+}
+
+// ============================================
+// MEDIA (Servicio centralizado de archivos)
+// ============================================
+
+model Media {
+  id            String   @id @default(uuid())
+  original_name String
+  file_name     String   // UUID-based stored filename
+  mime_type     String
+  size          Int
+  category      String   // 'cms_image', 'blog_image', 'site_asset'
+  visibility    String   @default("public") // 'public', 'company', 'private'
+  uploaded_by   String   // user_id from JWT
+  storage_path  String   // relative internal path on disk
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([category])
+  @@index([uploaded_by])
+  @@map("media")
+}
