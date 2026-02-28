@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Key,
   Plus,
@@ -14,6 +14,7 @@ import {
   Inbox,
   Info,
   FileDown,
+  ChevronsUpDown,
 } from 'lucide-react';
 import { useRentals, useUnits, useUnitTypes, useCondominiums } from '@/modules/ph';
 import { rentalsService } from '@/modules/ph/services/ph.service';
@@ -26,6 +27,7 @@ import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Select } from '@/shared/components/ui/select';
 import { DatePicker } from '@/shared/components/ui/date-picker';
+import { ExpandableTableGroup } from '@/shared/components/ui/expandable-table-group';
 import {
   Table,
   TableHeader,
@@ -233,6 +235,28 @@ export default function RentalsPage() {
   const totalFiltered = filteredRentals.length;
   const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
   const paginatedRentals = filteredRentals.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // ── Agrupación por renter_unit (Alquilado por) ──
+  const [expandedRenters, setExpandedRenters] = useState<Set<string>>(new Set());
+
+  const toggleRenter = useCallback((renterUnitId: string) => {
+    setExpandedRenters((prev) => {
+      const next = new Set(prev);
+      if (next.has(renterUnitId)) next.delete(renterUnitId);
+      else next.add(renterUnitId);
+      return next;
+    });
+  }, []);
+
+  const groupedRentals = useMemo(() => {
+    const map = new Map<string, PhRental[]>();
+    for (const r of paginatedRentals) {
+      const key = r.renter_unit_id;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    }
+    return Array.from(map.entries());
+  }, [paginatedRentals]);
 
   // Units filtered by selected condominium in create form
   const filteredUnitsForCreate = useMemo(() => {
@@ -498,9 +522,32 @@ export default function RentalsPage() {
           <CardTitle className="text-lg">
             Listado de Alquileres
           </CardTitle>
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            {totalFiltered} registro{totalFiltered !== 1 ? 's' : ''}
-          </span>
+          <div className="flex items-center gap-2">
+            {groupedRentals.some(([, items]) => items.length > 1) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-gray-500 dark:text-gray-400"
+                onClick={() => {
+                  const multiGroups = groupedRentals
+                    .filter(([, items]) => items.length > 1)
+                    .map(([id]) => id);
+                  const allExpanded = multiGroups.every((id) => expandedRenters.has(id));
+                  setExpandedRenters(allExpanded ? new Set() : new Set(multiGroups));
+                }}
+              >
+                <ChevronsUpDown className="h-3.5 w-3.5 mr-1" />
+                {groupedRentals
+                  .filter(([, items]) => items.length > 1)
+                  .every(([id]) => expandedRenters.has(id))
+                  ? 'Colapsar todo'
+                  : 'Expandir todo'}
+              </Button>
+            )}
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {totalFiltered} registro{totalFiltered !== 1 ? 's' : ''}
+            </span>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -523,9 +570,10 @@ export default function RentalsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-gray-200 dark:border-gray-700">
+                      <TableHead className="w-8 px-2" />
+                      <TableHead className="text-gray-600 dark:text-gray-400">Alquilado por</TableHead>
                       <TableHead className="text-gray-600 dark:text-gray-400">Unidad</TableHead>
                       <TableHead className="text-gray-600 dark:text-gray-400">Tipo</TableHead>
-                      <TableHead className="text-gray-600 dark:text-gray-400">Alquilado por</TableHead>
                       <TableHead className="text-gray-600 dark:text-gray-400">Entrada</TableHead>
                       <TableHead className="text-gray-600 dark:text-gray-400">Salida</TableHead>
                       <TableHead className="text-gray-600 dark:text-gray-400">Duracion</TableHead>
@@ -535,76 +583,180 @@ export default function RentalsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedRentals.map((rental) => {
-                      const unitType = rental.unit?.unit_type_id
-                        ? unitTypes.find((ut) => ut.id === rental.unit!.unit_type_id)
-                        : null;
+                    {groupedRentals.map(([renterUnitId, items]) => {
+                      const isMulti = items.length > 1;
+                      const renterLabel = items[0].renter_unit?.unit_number ?? getUnitLabel(renterUnitId);
+
                       return (
-                        <TableRow
-                          key={rental.id}
-                          className="border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-slate-800/50"
-                        >
-                          <TableCell className="text-gray-900 dark:text-gray-100 font-medium">
-                            {rental.unit?.unit_number ?? getUnitLabel(rental.unit_id)}
-                          </TableCell>
-                          <TableCell className="text-gray-700 dark:text-gray-300">
-                            {unitType?.name || '-'}
-                          </TableCell>
-                          <TableCell className="text-gray-700 dark:text-gray-300">
-                            {rental.renter_unit?.unit_number ?? getUnitLabel(rental.renter_unit_id)}
-                          </TableCell>
-                          <TableCell className="text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                            {formatDateTime(rental.start_time)}
-                          </TableCell>
-                          <TableCell className="text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                            {formatDateTime(rental.end_time)}
-                          </TableCell>
-                          <TableCell className="text-gray-700 dark:text-gray-300">
-                            {formatMinutes(rental.total_minutes)}
-                          </TableCell>
-                          <TableCell className="text-gray-700 dark:text-gray-300 text-right font-medium">
-                            {formatCOP(rental.amount)}
-                          </TableCell>
-                          <TableCell>
-                            {getStatusBadge(rental.status)}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openDetail(rental)}>
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  Ver detalle
-                                </DropdownMenuItem>
-                                {rental.status === 'completed' && (
-                                  <DropdownMenuItem onClick={() => handleDownloadReceipt(rental.id)}>
-                                    <FileDown className="h-4 w-4 mr-2" />
-                                    Descargar Soporte
-                                  </DropdownMenuItem>
-                                )}
-                                {rental.status === 'active' && (
-                                  <>
-                                    <DropdownMenuItem onClick={() => openCheckout(rental)}>
-                                      <LogOut className="h-4 w-4 mr-2" />
-                                      Registrar salida
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() => openCancel(rental)}
-                                      className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
-                                    >
-                                      <XCircle className="h-4 w-4 mr-2" />
-                                      Cancelar
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
+                        <ExpandableTableGroup
+                          key={renterUnitId}
+                          items={items}
+                          groupKey={renterUnitId}
+                          isExpanded={expandedRenters.has(renterUnitId)}
+                          onToggle={() => toggleRenter(renterUnitId)}
+                          colCount={10}
+                          renderParentCells={() => {
+                            if (isMulti) {
+                              return (
+                                <>
+                                  <TableCell className="font-medium text-gray-900 dark:text-gray-100">
+                                    {renterLabel}
+                                  </TableCell>
+                                  <TableCell className="text-gray-600 dark:text-gray-400">
+                                    <Badge variant="secondary" className="text-xs">
+                                      {items.length} alquileres
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell />
+                                  <TableCell />
+                                  <TableCell />
+                                  <TableCell />
+                                  <TableCell />
+                                  <TableCell />
+                                  <TableCell />
+                                </>
+                              );
+                            }
+
+                            const rental = items[0];
+                            const unitType = rental.unit?.unit_type_id
+                              ? unitTypes.find((ut) => ut.id === rental.unit!.unit_type_id)
+                              : null;
+                            return (
+                              <>
+                                <TableCell className="font-medium text-gray-900 dark:text-gray-100">
+                                  {renterLabel}
+                                </TableCell>
+                                <TableCell className="text-gray-900 dark:text-gray-100 font-medium">
+                                  {rental.unit?.unit_number ?? getUnitLabel(rental.unit_id)}
+                                </TableCell>
+                                <TableCell className="text-gray-700 dark:text-gray-300">
+                                  {unitType?.name || '-'}
+                                </TableCell>
+                                <TableCell className="text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                  {formatDateTime(rental.start_time)}
+                                </TableCell>
+                                <TableCell className="text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                  {formatDateTime(rental.end_time)}
+                                </TableCell>
+                                <TableCell className="text-gray-700 dark:text-gray-300">
+                                  {formatMinutes(rental.total_minutes)}
+                                </TableCell>
+                                <TableCell className="text-gray-700 dark:text-gray-300 text-right font-medium">
+                                  {formatCOP(rental.amount)}
+                                </TableCell>
+                                <TableCell>
+                                  {getStatusBadge(rental.status)}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => openDetail(rental)}>
+                                        <Eye className="h-4 w-4 mr-2" />
+                                        Ver detalle
+                                      </DropdownMenuItem>
+                                      {rental.status === 'completed' && (
+                                        <DropdownMenuItem onClick={() => handleDownloadReceipt(rental.id)}>
+                                          <FileDown className="h-4 w-4 mr-2" />
+                                          Descargar Soporte
+                                        </DropdownMenuItem>
+                                      )}
+                                      {rental.status === 'active' && (
+                                        <>
+                                          <DropdownMenuItem onClick={() => openCheckout(rental)}>
+                                            <LogOut className="h-4 w-4 mr-2" />
+                                            Registrar salida
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            onClick={() => openCancel(rental)}
+                                            className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                                          >
+                                            <XCircle className="h-4 w-4 mr-2" />
+                                            Cancelar
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                              </>
+                            );
+                          }}
+                          renderChildRow={(rental) => {
+                            const unitType = rental.unit?.unit_type_id
+                              ? unitTypes.find((ut) => ut.id === rental.unit!.unit_type_id)
+                              : null;
+                            return (
+                              <>
+                                <TableCell className="w-8 px-2" />
+                                {/* Alquilado por vacío (ya está en padre) */}
+                                <TableCell />
+                                <TableCell className="text-gray-900 dark:text-gray-100 font-medium">
+                                  {rental.unit?.unit_number ?? getUnitLabel(rental.unit_id)}
+                                </TableCell>
+                                <TableCell className="text-gray-700 dark:text-gray-300">
+                                  {unitType?.name || '-'}
+                                </TableCell>
+                                <TableCell className="text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                  {formatDateTime(rental.start_time)}
+                                </TableCell>
+                                <TableCell className="text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                  {formatDateTime(rental.end_time)}
+                                </TableCell>
+                                <TableCell className="text-gray-700 dark:text-gray-300">
+                                  {formatMinutes(rental.total_minutes)}
+                                </TableCell>
+                                <TableCell className="text-gray-700 dark:text-gray-300 text-right font-medium">
+                                  {formatCOP(rental.amount)}
+                                </TableCell>
+                                <TableCell>
+                                  {getStatusBadge(rental.status)}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => openDetail(rental)}>
+                                        <Eye className="h-4 w-4 mr-2" />
+                                        Ver detalle
+                                      </DropdownMenuItem>
+                                      {rental.status === 'completed' && (
+                                        <DropdownMenuItem onClick={() => handleDownloadReceipt(rental.id)}>
+                                          <FileDown className="h-4 w-4 mr-2" />
+                                          Descargar Soporte
+                                        </DropdownMenuItem>
+                                      )}
+                                      {rental.status === 'active' && (
+                                        <>
+                                          <DropdownMenuItem onClick={() => openCheckout(rental)}>
+                                            <LogOut className="h-4 w-4 mr-2" />
+                                            Registrar salida
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            onClick={() => openCancel(rental)}
+                                            className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                                          >
+                                            <XCircle className="h-4 w-4 mr-2" />
+                                            Cancelar
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                              </>
+                            );
+                          }}
+                        />
                       );
                     })}
                   </TableBody>
