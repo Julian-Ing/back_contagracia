@@ -179,6 +179,108 @@ export class UnitsService {
     };
   }
 
+  async logNameChange(
+    companyId: string,
+    unitId: string,
+    oldName: string,
+    newName: string,
+    userId?: string,
+    email?: string,
+  ) {
+    try {
+      const db = await this.tenantPrisma.getClientForCompany(companyId);
+      await db.auditLog.create({
+        data: {
+          action_key: 'unit.name_changed',
+          entity_type: 'unit',
+          entity_id: unitId,
+          old_values: { unit_number: oldName },
+          new_values: { unit_number: newName },
+          user_id: userId ?? null,
+          email: email ?? null,
+          company_id: companyId,
+          service_name: 'ph-service',
+        },
+      });
+    } catch (err) {
+      this.logger.warn(`Error al registrar cambio de nombre: ${err.message}`);
+    }
+  }
+
+  async logCondominiumChange(
+    companyId: string,
+    unitId: string,
+    oldCondoId: string,
+    newCondoId: string,
+    oldCondoName: string,
+    newCondoName: string,
+    userId?: string,
+    email?: string,
+  ) {
+    try {
+      const db = await this.tenantPrisma.getClientForCompany(companyId);
+      await db.auditLog.create({
+        data: {
+          action_key: 'unit.condominium_changed',
+          entity_type: 'unit',
+          entity_id: unitId,
+          old_values: { condominium: oldCondoName },
+          new_values: { condominium: newCondoName },
+          user_id: userId ?? null,
+          email: email ?? null,
+          company_id: companyId,
+          service_name: 'ph-service',
+        },
+      });
+    } catch (err) {
+      this.logger.warn(`Error al registrar cambio de copropiedad: ${err.message}`);
+    }
+  }
+
+  async getHistory(companyId: string, unitId: string) {
+    const db = await this.tenantPrisma.getClientForCompany(companyId);
+
+    return db.auditLog.findMany({
+      where: {
+        entity_type: 'unit',
+        entity_id: unitId,
+        action_key: {
+          in: [
+            'unit.name_changed',
+            'unit.condominium_changed',
+            'unit.resident_added',
+            'unit.resident_type_changed',
+            'unit.resident_removed',
+            'unit.owner_changed',
+            'unit.resident_unit_changed',
+            'unit.resident_condominium_changed',
+            'unit.resident_tower_changed',
+          ],
+        },
+      },
+      orderBy: { performed_at: 'desc' },
+      select: {
+        id: true,
+        action_key: true,
+        old_values: true,
+        new_values: true,
+        email: true,
+        performed_at: true,
+      },
+    });
+  }
+
+  async deleteHistoryEntry(companyId: string, historyId: string) {
+    const db = await this.tenantPrisma.getClientForCompany(companyId);
+
+    const entry = await db.auditLog.findUnique({ where: { id: historyId } });
+    if (!entry) {
+      throw new NotFoundException('Registro de historial no encontrado');
+    }
+
+    return db.auditLog.delete({ where: { id: historyId } });
+  }
+
   async remove(companyId: string, id: string) {
     const db = await this.tenantPrisma.getClientForCompany(companyId);
 

@@ -74,6 +74,32 @@ export class ResidentsController {
 
   /**
    * Permission: ph.residents.view
+   * Historial de cambios de un residente
+   */
+  @Get(':id/history')
+  @ApiOperation({ summary: 'Historial de cambios de un residente' })
+  async getResidentHistory(
+    @Param('companyId') companyId: string,
+    @Param('id') id: string,
+  ) {
+    return this.residentsService.getResidentHistory(companyId, id);
+  }
+
+  /**
+   * Permission: ph.residents.edit
+   * Eliminar un registro del historial de cambios
+   */
+  @Delete(':id/history/:historyId')
+  @ApiOperation({ summary: 'Eliminar registro de historial de residente' })
+  async deleteResidentHistoryEntry(
+    @Param('companyId') companyId: string,
+    @Param('historyId') historyId: string,
+  ) {
+    return this.residentsService.deleteResidentHistoryEntry(companyId, historyId);
+  }
+
+  /**
+   * Permission: ph.residents.view
    * Obtener residente por ID
    */
   @Get(':id')
@@ -95,8 +121,25 @@ export class ResidentsController {
   async create(
     @Param('companyId') companyId: string,
     @Body() dto: CreateResidentDto,
+    @Request() req: any,
   ) {
-    return this.residentsService.create(companyId, dto);
+    const result = await this.residentsService.create(companyId, dto);
+
+    // Registrar en historial de la unidad
+    this.residentsService.logResidentAdded(
+      companyId, dto.unit_id, dto.tercero_id, dto.resident_type,
+      req.user?.sub, req.user?.email,
+    );
+
+    // Registrar cambio de copropietario si el nuevo residente es propietario
+    if (dto.resident_type === 'owner') {
+      this.residentsService.logOwnerChange(
+        companyId, dto.unit_id, dto.tercero_id,
+        req.user?.sub, req.user?.email,
+      );
+    }
+
+    return result;
   }
 
   /**
@@ -110,8 +153,59 @@ export class ResidentsController {
     @Param('companyId') companyId: string,
     @Param('id') id: string,
     @Body() dto: UpdateResidentDto,
+    @Request() req: any,
   ) {
-    return this.residentsService.update(companyId, id, dto);
+    // Capturar datos anteriores para detectar cambios
+    const current = await this.residentsService.findOne(companyId, id);
+
+    const result = await this.residentsService.update(companyId, id, dto);
+
+    // Registrar cambio de tipo de residente
+    if (dto.resident_type && dto.resident_type !== current.resident_type) {
+      this.residentsService.logResidentTypeChanged(
+        companyId, current.unit_id, current.tercero_id,
+        current.resident_type, dto.resident_type,
+        req.user?.sub, req.user?.email,
+      );
+
+      // Registrar cambio de copropietario si el tipo cambió a propietario
+      if (dto.resident_type === 'owner') {
+        this.residentsService.logOwnerChange(
+          companyId, current.unit_id, current.tercero_id,
+          req.user?.sub, req.user?.email,
+        );
+      }
+    }
+
+    // Registrar cambios de unidad, copropiedad y torre si cambió el unit_id
+    if (dto.unit_id && dto.unit_id !== current.unit_id) {
+      this.residentsService.logResidentUnitChanged(
+        companyId, current.tercero_id,
+        current.unit_id, dto.unit_id,
+        req.user?.sub, req.user?.email,
+      );
+      this.residentsService.logResidentCondominiumChanged(
+        companyId, current.tercero_id,
+        current.unit_id, dto.unit_id,
+        req.user?.sub, req.user?.email,
+      );
+      this.residentsService.logResidentTowerChanged(
+        companyId, current.tercero_id,
+        current.unit_id, dto.unit_id,
+        req.user?.sub, req.user?.email,
+      );
+    }
+
+    // Registrar cambio de copropietario si cambió el tercero en un residente propietario
+    const effectiveType = dto.resident_type || current.resident_type;
+    if (dto.tercero_id && dto.tercero_id !== current.tercero_id && effectiveType === 'owner') {
+      this.residentsService.logDirectOwnerChange(
+        companyId, current.unit_id, current.tercero_id, dto.tercero_id,
+        req.user?.sub, req.user?.email,
+      );
+    }
+
+    return result;
   }
 
   /**
@@ -124,7 +218,19 @@ export class ResidentsController {
   async remove(
     @Param('companyId') companyId: string,
     @Param('id') id: string,
+    @Request() req: any,
   ) {
-    return this.residentsService.remove(companyId, id);
+    // Capturar datos antes de eliminar
+    const current = await this.residentsService.findOne(companyId, id);
+
+    const result = await this.residentsService.remove(companyId, id);
+
+    // Registrar en historial de la unidad
+    this.residentsService.logResidentRemoved(
+      companyId, current.unit_id, current.tercero_id, current.resident_type,
+      req.user?.sub, req.user?.email,
+    );
+
+    return result;
   }
 }

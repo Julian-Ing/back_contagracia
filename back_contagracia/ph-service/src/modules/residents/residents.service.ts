@@ -1,10 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { TenantPrismaService } from '../tenant/tenant-prisma.service';
 import { CreateResidentDto } from './dto/create-resident.dto';
 import { UpdateResidentDto } from './dto/update-resident.dto';
 
+const RESIDENT_TYPE_LABELS: Record<string, string> = {
+  owner: 'Propietario',
+  tenant: 'Arrendatario',
+};
+
 @Injectable()
 export class ResidentsService {
+  private readonly logger = new Logger(ResidentsService.name);
+
   constructor(private readonly tenantPrisma: TenantPrismaService) {}
 
   async findAll(
@@ -226,5 +233,415 @@ export class ResidentsService {
         move_out_date: new Date(),
       },
     });
+  }
+
+  // ── Historial helpers ──
+
+  private async getTerceroName(db: any, terceroId: string): Promise<string> {
+    try {
+      const tercero = await db.thirdParty.findUnique({
+        where: { id: terceroId },
+        select: { name: true, first_name: true, first_surname: true },
+      });
+      if (!tercero) return 'Desconocido';
+      return tercero.name || `${tercero.first_name || ''} ${tercero.first_surname || ''}`.trim() || 'Desconocido';
+    } catch {
+      return 'Desconocido';
+    }
+  }
+
+  async logResidentAdded(
+    companyId: string,
+    unitId: string,
+    terceroId: string,
+    residentType: string,
+    userId?: string,
+    email?: string,
+  ) {
+    try {
+      const db = await this.tenantPrisma.getClientForCompany(companyId);
+      const name = await this.getTerceroName(db, terceroId);
+      await db.auditLog.create({
+        data: {
+          action_key: 'unit.resident_added',
+          entity_type: 'unit',
+          entity_id: unitId,
+          old_values: {},
+          new_values: {
+            resident_name: name,
+            resident_type: RESIDENT_TYPE_LABELS[residentType] || residentType,
+          },
+          user_id: userId ?? null,
+          email: email ?? null,
+          company_id: companyId,
+          service_name: 'ph-service',
+        },
+      });
+    } catch (err) {
+      this.logger.warn(`Error al registrar residente agregado: ${err.message}`);
+    }
+  }
+
+  async logResidentTypeChanged(
+    companyId: string,
+    unitId: string,
+    terceroId: string,
+    oldType: string,
+    newType: string,
+    userId?: string,
+    email?: string,
+  ) {
+    try {
+      const db = await this.tenantPrisma.getClientForCompany(companyId);
+      const name = await this.getTerceroName(db, terceroId);
+      await db.auditLog.create({
+        data: {
+          action_key: 'unit.resident_type_changed',
+          entity_type: 'unit',
+          entity_id: unitId,
+          old_values: {
+            resident_name: name,
+            resident_type: RESIDENT_TYPE_LABELS[oldType] || oldType,
+          },
+          new_values: {
+            resident_name: name,
+            resident_type: RESIDENT_TYPE_LABELS[newType] || newType,
+          },
+          user_id: userId ?? null,
+          email: email ?? null,
+          company_id: companyId,
+          service_name: 'ph-service',
+        },
+      });
+    } catch (err) {
+      this.logger.warn(`Error al registrar cambio de tipo de residente: ${err.message}`);
+    }
+  }
+
+  async logResidentRemoved(
+    companyId: string,
+    unitId: string,
+    terceroId: string,
+    residentType: string,
+    userId?: string,
+    email?: string,
+  ) {
+    try {
+      const db = await this.tenantPrisma.getClientForCompany(companyId);
+      const name = await this.getTerceroName(db, terceroId);
+      await db.auditLog.create({
+        data: {
+          action_key: 'unit.resident_removed',
+          entity_type: 'unit',
+          entity_id: unitId,
+          old_values: {
+            resident_name: name,
+            resident_type: RESIDENT_TYPE_LABELS[residentType] || residentType,
+          },
+          new_values: {},
+          user_id: userId ?? null,
+          email: email ?? null,
+          company_id: companyId,
+          service_name: 'ph-service',
+        },
+      });
+    } catch (err) {
+      this.logger.warn(`Error al registrar residente eliminado: ${err.message}`);
+    }
+  }
+
+  async logOwnerChange(
+    companyId: string,
+    unitId: string,
+    newTerceroId: string,
+    userId?: string,
+    email?: string,
+  ) {
+    try {
+      const db = await this.tenantPrisma.getClientForCompany(companyId);
+
+      // Buscar propietario anterior (activo o inactivo) excluyendo el nuevo
+      const previousOwner = await db.phUnitResident.findFirst({
+        where: {
+          unit_id: unitId,
+          resident_type: 'owner',
+          tercero_id: { not: newTerceroId },
+        },
+        orderBy: { updated_at: 'desc' },
+        select: { tercero_id: true },
+      });
+
+      if (!previousOwner) return; // No había propietario anterior
+
+      const [oldName, newName] = await Promise.all([
+        this.getTerceroName(db, previousOwner.tercero_id),
+        this.getTerceroName(db, newTerceroId),
+      ]);
+
+      await db.auditLog.create({
+        data: {
+          action_key: 'unit.owner_changed',
+          entity_type: 'unit',
+          entity_id: unitId,
+          old_values: { owner_name: oldName },
+          new_values: { owner_name: newName },
+          user_id: userId ?? null,
+          email: email ?? null,
+          company_id: companyId,
+          service_name: 'ph-service',
+        },
+      });
+    } catch (err) {
+      this.logger.warn(`Error al registrar cambio de copropietario: ${err.message}`);
+    }
+  }
+
+  async logDirectOwnerChange(
+    companyId: string,
+    unitId: string,
+    oldTerceroId: string,
+    newTerceroId: string,
+    userId?: string,
+    email?: string,
+  ) {
+    try {
+      const db = await this.tenantPrisma.getClientForCompany(companyId);
+      const [oldName, newName] = await Promise.all([
+        this.getTerceroName(db, oldTerceroId),
+        this.getTerceroName(db, newTerceroId),
+      ]);
+
+      await db.auditLog.create({
+        data: {
+          action_key: 'unit.owner_changed',
+          entity_type: 'unit',
+          entity_id: unitId,
+          old_values: { owner_name: oldName },
+          new_values: { owner_name: newName },
+          user_id: userId ?? null,
+          email: email ?? null,
+          company_id: companyId,
+          service_name: 'ph-service',
+        },
+      });
+    } catch (err) {
+      this.logger.warn(`Error al registrar cambio directo de copropietario: ${err.message}`);
+    }
+  }
+
+  async logResidentUnitChanged(
+    companyId: string,
+    terceroId: string,
+    oldUnitId: string,
+    newUnitId: string,
+    userId?: string,
+    email?: string,
+  ) {
+    try {
+      const db = await this.tenantPrisma.getClientForCompany(companyId);
+
+      // Resolver nombre del residente y nombres de ambas unidades en paralelo
+      const [name, oldUnit, newUnit] = await Promise.all([
+        this.getTerceroName(db, terceroId),
+        db.phUnit.findUnique({ where: { id: oldUnitId }, select: { unit_number: true } }),
+        db.phUnit.findUnique({ where: { id: newUnitId }, select: { unit_number: true } }),
+      ]);
+
+      const oldUnitName = oldUnit?.unit_number || 'Desconocida';
+      const newUnitName = newUnit?.unit_number || 'Desconocida';
+
+      const commonData = {
+        action_key: 'unit.resident_unit_changed',
+        entity_type: 'unit',
+        old_values: { resident_name: name, unit_name: oldUnitName },
+        new_values: { resident_name: name, unit_name: newUnitName },
+        user_id: userId ?? null,
+        email: email ?? null,
+        company_id: companyId,
+        service_name: 'ph-service',
+      };
+
+      // Registrar en ambas unidades para que ambos historiales lo muestren
+      await Promise.all([
+        db.auditLog.create({ data: { ...commonData, entity_id: oldUnitId } }),
+        db.auditLog.create({ data: { ...commonData, entity_id: newUnitId } }),
+      ]);
+    } catch (err) {
+      this.logger.warn(`Error al registrar cambio de unidad del residente: ${err.message}`);
+    }
+  }
+
+  async logResidentCondominiumChanged(
+    companyId: string,
+    terceroId: string,
+    oldUnitId: string,
+    newUnitId: string,
+    userId?: string,
+    email?: string,
+  ) {
+    try {
+      const db = await this.tenantPrisma.getClientForCompany(companyId);
+
+      const [name, oldUnit, newUnit] = await Promise.all([
+        this.getTerceroName(db, terceroId),
+        db.phUnit.findUnique({
+          where: { id: oldUnitId },
+          select: { condominium_id: true, condominium: { select: { name: true } } },
+        }),
+        db.phUnit.findUnique({
+          where: { id: newUnitId },
+          select: { condominium_id: true, condominium: { select: { name: true } } },
+        }),
+      ]);
+
+      // Solo registrar si la copropiedad realmente cambió
+      if (!oldUnit || !newUnit || oldUnit.condominium_id === newUnit.condominium_id) return;
+
+      const oldCondoName = oldUnit.condominium?.name || 'Desconocida';
+      const newCondoName = newUnit.condominium?.name || 'Desconocida';
+
+      const commonData = {
+        action_key: 'unit.resident_condominium_changed',
+        entity_type: 'unit',
+        old_values: { resident_name: name, condominium_name: oldCondoName },
+        new_values: { resident_name: name, condominium_name: newCondoName },
+        user_id: userId ?? null,
+        email: email ?? null,
+        company_id: companyId,
+        service_name: 'ph-service',
+      };
+
+      await Promise.all([
+        db.auditLog.create({ data: { ...commonData, entity_id: oldUnitId } }),
+        db.auditLog.create({ data: { ...commonData, entity_id: newUnitId } }),
+      ]);
+    } catch (err) {
+      this.logger.warn(`Error al registrar cambio de copropiedad del residente: ${err.message}`);
+    }
+  }
+
+  async logResidentTowerChanged(
+    companyId: string,
+    terceroId: string,
+    oldUnitId: string,
+    newUnitId: string,
+    userId?: string,
+    email?: string,
+  ) {
+    try {
+      const db = await this.tenantPrisma.getClientForCompany(companyId);
+
+      const [name, oldUnit, newUnit] = await Promise.all([
+        this.getTerceroName(db, terceroId),
+        db.phUnit.findUnique({
+          where: { id: oldUnitId },
+          select: { tower_id: true, tower: { select: { name: true } } },
+        }),
+        db.phUnit.findUnique({
+          where: { id: newUnitId },
+          select: { tower_id: true, tower: { select: { name: true } } },
+        }),
+      ]);
+
+      // Solo registrar si la torre realmente cambió
+      if (!oldUnit || !newUnit) return;
+      if (oldUnit.tower_id === newUnit.tower_id) return;
+
+      const oldTowerName = oldUnit.tower?.name || 'Sin torre';
+      const newTowerName = newUnit.tower?.name || 'Sin torre';
+
+      const commonData = {
+        action_key: 'unit.resident_tower_changed',
+        entity_type: 'unit',
+        old_values: { resident_name: name, tower_name: oldTowerName },
+        new_values: { resident_name: name, tower_name: newTowerName },
+        user_id: userId ?? null,
+        email: email ?? null,
+        company_id: companyId,
+        service_name: 'ph-service',
+      };
+
+      await Promise.all([
+        db.auditLog.create({ data: { ...commonData, entity_id: oldUnitId } }),
+        db.auditLog.create({ data: { ...commonData, entity_id: newUnitId } }),
+      ]);
+    } catch (err) {
+      this.logger.warn(`Error al registrar cambio de torre del residente: ${err.message}`);
+    }
+  }
+
+  async getResidentHistory(companyId: string, residentId: string) {
+    const db = await this.tenantPrisma.getClientForCompany(companyId);
+
+    // Obtener el residente para saber su unit_id y tercero_id
+    const resident = await db.phUnitResident.findUnique({
+      where: { id: residentId },
+      select: { unit_id: true, tercero_id: true },
+    });
+
+    if (!resident) {
+      throw new NotFoundException('Residente no encontrado');
+    }
+
+    // Buscar el nombre del tercero para filtrar entradas relevantes
+    const tercero = await db.thirdParty.findUnique({
+      where: { id: resident.tercero_id },
+      select: { name: true, first_name: true, first_surname: true },
+    });
+    const terceroName = tercero?.name
+      || `${tercero?.first_name || ''} ${tercero?.first_surname || ''}`.trim()
+      || '';
+
+    // Obtener historial de la unidad relacionado con residentes
+    const entries = await db.auditLog.findMany({
+      where: {
+        entity_type: 'unit',
+        entity_id: resident.unit_id,
+        action_key: {
+          in: [
+            'unit.resident_added',
+            'unit.resident_type_changed',
+            'unit.resident_removed',
+            'unit.owner_changed',
+            'unit.resident_unit_changed',
+            'unit.resident_condominium_changed',
+            'unit.resident_tower_changed',
+          ],
+        },
+      },
+      orderBy: { performed_at: 'desc' },
+      select: {
+        id: true,
+        action_key: true,
+        old_values: true,
+        new_values: true,
+        email: true,
+        performed_at: true,
+      },
+    });
+
+    // Filtrar solo entradas que involucran a este tercero
+    return entries.filter((entry) => {
+      const oldVals = entry.old_values as Record<string, any> | null;
+      const newVals = entry.new_values as Record<string, any> | null;
+      const nameFields = [
+        oldVals?.resident_name,
+        newVals?.resident_name,
+        oldVals?.owner_name,
+        newVals?.owner_name,
+      ].filter(Boolean);
+      return nameFields.some((n) => n === terceroName);
+    });
+  }
+
+  async deleteResidentHistoryEntry(companyId: string, historyId: string) {
+    const db = await this.tenantPrisma.getClientForCompany(companyId);
+
+    const entry = await db.auditLog.findUnique({ where: { id: historyId } });
+    if (!entry) {
+      throw new NotFoundException('Registro de historial no encontrado');
+    }
+
+    return db.auditLog.delete({ where: { id: historyId } });
   }
 }

@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Check,
   ChevronsUpDown,
+  History,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
@@ -53,6 +54,8 @@ import { usePermissions } from '@/shared/hooks/usePermissions';
 import { useResidents, useCondominiums, towersService, unitsService, delinquentService } from '@/modules/ph';
 import type { PhResident, PhTower, PhUnit } from '@/modules/ph';
 import { companyClient } from '@/shared/services/api/apiClient';
+import { residentsService } from '@/modules/ph/services/ph.service';
+import toast from 'react-hot-toast';
 
 const PAGE_SIZE = 20;
 
@@ -108,6 +111,9 @@ export default function ResidentsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const [selectedResident, setSelectedResident] = useState<PhResident | null>(null);
   const [formData, setFormData] = useState({ ...emptyForm });
@@ -366,6 +372,22 @@ export default function ResidentsPage() {
   const handleOpenDelete = (resident: PhResident) => {
     setSelectedResident(resident);
     setIsDeleteOpen(true);
+  };
+
+  const handleOpenHistory = async (resident: PhResident) => {
+    if (!companyId) return;
+    setSelectedResident(resident);
+    setIsHistoryOpen(true);
+    setHistoryLoading(true);
+    try {
+      const data = await residentsService.getHistory(companyId, resident.id);
+      setHistoryData(data);
+    } catch {
+      toast.error('Error al cargar historial');
+      setHistoryData([]);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const buildPayload = () => {
@@ -799,6 +821,10 @@ export default function ResidentsPage() {
                                         </Button>
                                       </DropdownMenuTrigger>
                                       <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => handleOpenHistory(items[0])}>
+                                          <History className="h-4 w-4 mr-2" />
+                                          Historial
+                                        </DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => handleOpenEdit(items[0])}>
                                           <Pencil className="h-4 w-4 mr-2" />
                                           Editar
@@ -887,6 +913,10 @@ export default function ResidentsPage() {
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleOpenHistory(resident)}>
+                                      <History className="h-4 w-4 mr-2" />
+                                      Historial
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => handleOpenEdit(resident)}>
                                       <Pencil className="h-4 w-4 mr-2" />
                                       Editar
@@ -1009,6 +1039,219 @@ export default function ResidentsPage() {
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
               {submitting ? 'Eliminando...' : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── History Dialog ── */}
+      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Historial — {selectedResident?.unit?.unit_number || 'Residente'}
+            </DialogTitle>
+          </DialogHeader>
+          {historyLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+            </div>
+          ) : historyData.length === 0 ? (
+            <p className="text-center text-gray-500 dark:text-slate-400 py-8">
+              No hay cambios registrados para este residente.
+            </p>
+          ) : (
+            <div className="space-y-3 py-2">
+              {historyData.map((entry: any) => {
+                const actionKey = entry.action_key;
+
+                const badgeConfig: Record<string, { label: string; className: string }> = {
+                  'unit.resident_added': {
+                    label: 'Residente agregado',
+                    className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+                  },
+                  'unit.resident_type_changed': {
+                    label: 'Cambio tipo residente',
+                    className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+                  },
+                  'unit.resident_removed': {
+                    label: 'Residente eliminado',
+                    className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+                  },
+                  'unit.owner_changed': {
+                    label: 'Cambio de copropietario',
+                    className: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+                  },
+                  'unit.resident_unit_changed': {
+                    label: 'Cambio de unidad',
+                    className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
+                  },
+                  'unit.resident_condominium_changed': {
+                    label: 'Cambio de copropiedad',
+                    className: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+                  },
+                  'unit.resident_tower_changed': {
+                    label: 'Cambio de torre',
+                    className: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+                  },
+                };
+
+                const badge = badgeConfig[actionKey] || {
+                  label: 'Cambio',
+                  className: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400',
+                };
+
+                const renderContent = () => {
+                  if (actionKey === 'unit.resident_added') {
+                    const name = entry.new_values?.resident_name ?? '';
+                    const type = entry.new_values?.resident_type ?? '';
+                    return (
+                      <div className="text-sm">
+                        <span className="font-medium text-gray-900 dark:text-white">{name}</span>
+                        {type && (
+                          <span className="text-gray-500 dark:text-slate-400"> — {type}</span>
+                        )}
+                      </div>
+                    );
+                  }
+                  if (actionKey === 'unit.resident_type_changed') {
+                    const name = entry.old_values?.resident_name ?? '';
+                    const oldType = entry.old_values?.resident_type ?? '';
+                    const newType = entry.new_values?.resident_type ?? '';
+                    return (
+                      <div className="text-sm">
+                        <span className="font-medium text-gray-900 dark:text-white">{name}: </span>
+                        <span className="text-red-500 line-through">{oldType}</span>
+                        {' '}
+                        <span className="text-gray-400 dark:text-slate-500">&rarr;</span>
+                        {' '}
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">{newType}</span>
+                      </div>
+                    );
+                  }
+                  if (actionKey === 'unit.resident_removed') {
+                    const name = entry.old_values?.resident_name ?? '';
+                    const type = entry.old_values?.resident_type ?? '';
+                    return (
+                      <div className="text-sm">
+                        <span className="font-medium text-gray-900 dark:text-white">{name}</span>
+                        {type && (
+                          <span className="text-gray-500 dark:text-slate-400"> — {type}</span>
+                        )}
+                      </div>
+                    );
+                  }
+                  if (actionKey === 'unit.owner_changed') {
+                    const oldOwner = entry.old_values?.owner_name ?? '';
+                    const newOwner = entry.new_values?.owner_name ?? '';
+                    return (
+                      <div className="text-sm">
+                        <span className="text-red-500 line-through">{oldOwner}</span>
+                        {' '}
+                        <span className="text-gray-400 dark:text-slate-500">&rarr;</span>
+                        {' '}
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">{newOwner}</span>
+                      </div>
+                    );
+                  }
+                  if (actionKey === 'unit.resident_unit_changed') {
+                    const oldUnit = entry.old_values?.unit_name ?? '';
+                    const newUnit = entry.new_values?.unit_name ?? '';
+                    return (
+                      <div className="text-sm">
+                        <span className="text-red-500 line-through">{oldUnit}</span>
+                        {' '}
+                        <span className="text-gray-400 dark:text-slate-500">&rarr;</span>
+                        {' '}
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">{newUnit}</span>
+                      </div>
+                    );
+                  }
+                  if (actionKey === 'unit.resident_condominium_changed') {
+                    const oldCondo = entry.old_values?.condominium_name ?? '';
+                    const newCondo = entry.new_values?.condominium_name ?? '';
+                    return (
+                      <div className="text-sm">
+                        <span className="text-red-500 line-through">{oldCondo}</span>
+                        {' '}
+                        <span className="text-gray-400 dark:text-slate-500">&rarr;</span>
+                        {' '}
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">{newCondo}</span>
+                      </div>
+                    );
+                  }
+                  if (actionKey === 'unit.resident_tower_changed') {
+                    const oldTower = entry.old_values?.tower_name ?? '';
+                    const newTower = entry.new_values?.tower_name ?? '';
+                    return (
+                      <div className="text-sm">
+                        <span className="text-red-500 line-through">{oldTower}</span>
+                        {' '}
+                        <span className="text-gray-400 dark:text-slate-500">&rarr;</span>
+                        {' '}
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">{newTower}</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                };
+
+                return (
+                  <div
+                    key={entry.id}
+                    className="border border-gray-200 dark:border-slate-700 rounded-lg p-3 space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <Badge className={badge.className}>
+                        {badge.label}
+                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 dark:text-slate-400">
+                          {new Date(entry.performed_at).toLocaleString('es-CO', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                        {canManage && (
+                          <button
+                            type="button"
+                            className="text-gray-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 transition-colors"
+                            title="Eliminar registro"
+                            onClick={async () => {
+                              if (!companyId || !selectedResident) return;
+                              try {
+                                await residentsService.deleteHistory(companyId, selectedResident.id, entry.id);
+                                setHistoryData((prev) => prev.filter((e: any) => e.id !== entry.id));
+                                toast.success('Registro eliminado');
+                              } catch {
+                                toast.error('Error al eliminar registro');
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {entry.email && (
+                      <p className="text-xs text-gray-500 dark:text-slate-400">
+                        Por: {entry.email}
+                      </p>
+                    )}
+
+                    {renderContent()}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsHistoryOpen(false)}>
+              Cerrar
             </Button>
           </DialogFooter>
         </DialogContent>

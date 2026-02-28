@@ -81,6 +81,32 @@ export class UnitsController {
 
   /**
    * Permission: ph.units.view
+   * Historial de cambios de una unidad
+   */
+  @Get(':id/history')
+  @ApiOperation({ summary: 'Historial de cambios de una unidad' })
+  async getHistory(
+    @Param('companyId') companyId: string,
+    @Param('id') id: string,
+  ) {
+    return this.unitsService.getHistory(companyId, id);
+  }
+
+  /**
+   * Permission: ph.units.edit
+   * Eliminar un registro del historial de cambios
+   */
+  @Delete(':id/history/:historyId')
+  @ApiOperation({ summary: 'Eliminar registro de historial' })
+  async deleteHistoryEntry(
+    @Param('companyId') companyId: string,
+    @Param('historyId') historyId: string,
+  ) {
+    return this.unitsService.deleteHistoryEntry(companyId, historyId);
+  }
+
+  /**
+   * Permission: ph.units.view
    * Obtener una unidad por ID con todas sus relaciones
    */
   @Get(':id')
@@ -118,8 +144,33 @@ export class UnitsController {
     @Param('companyId') companyId: string,
     @Param('id') id: string,
     @Body() dto: UpdateUnitDto,
+    @Request() req: any,
   ) {
-    return this.unitsService.update(companyId, id, dto);
+    // Capturar datos anteriores antes de actualizar
+    const current = await this.unitsService.findOne(companyId, id);
+
+    const result = await this.unitsService.update(companyId, id, dto);
+
+    // Registrar cambio de nombre si cambió
+    if (dto.unit_number && dto.unit_number !== current.unit_number) {
+      this.unitsService.logNameChange(
+        companyId, id, current.unit_number, dto.unit_number,
+        req.user?.sub, req.user?.email,
+      );
+    }
+
+    // Registrar cambio de copropiedad si cambió
+    if (dto.condominium_id && dto.condominium_id !== current.condominium_id) {
+      this.unitsService.logCondominiumChange(
+        companyId, id,
+        current.condominium_id, dto.condominium_id,
+        current.condominium?.name || 'Desconocida',
+        result.condominium?.name || 'Desconocida',
+        req.user?.sub, req.user?.email,
+      );
+    }
+
+    return result;
   }
 
   /**

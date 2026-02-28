@@ -54,6 +54,10 @@ export const unitsService = {
     phClient.patch(`${base(companyId)}/units/${id}`, data).then(r => r.data),
   remove: (companyId: string, id: string) =>
     phClient.delete(`${base(companyId)}/units/${id}`).then(r => r.data),
+  getHistory: (companyId: string, unitId: string) =>
+    phClient.get(`${base(companyId)}/units/${unitId}/history`).then(r => r.data),
+  deleteHistory: (companyId: string, unitId: string, historyId: string) =>
+    phClient.delete(`${base(companyId)}/units/${unitId}/history/${historyId}`).then(r => r.data),
   getCoefficientSum: (companyId: string, condominiumId: string, excludeUnitId?: string) =>
     phClient.get(`${base(companyId)}/units/coefficient-sum`, {
       params: { condominium_id: condominiumId, exclude_unit_id: excludeUnitId },
@@ -75,6 +79,10 @@ export const residentsService = {
   /** Obtener unidades del usuario logueado (residente) */
   getMyUnits: (companyId: string) =>
     phClient.get(`${base(companyId)}/residents/my-units`).then(r => r.data),
+  getHistory: (companyId: string, residentId: string) =>
+    phClient.get(`${base(companyId)}/residents/${residentId}/history`).then(r => r.data),
+  deleteHistory: (companyId: string, residentId: string, historyId: string) =>
+    phClient.delete(`${base(companyId)}/residents/${residentId}/history/${historyId}`).then(r => r.data),
 };
 
 // ─── Vehicles ───
